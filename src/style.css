@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #18181b;
+  background: #f4f4f5;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  min-height: 100%;
+  background: #f4f4f5;
+}
+
+html.dark {
+  color: #f4f4f5;
+  background: #09090b;
+}
+
+body {
+  min-width: 1180px;
+  margin: 0;
+  color: #18181b;
+  background:
+    linear-gradient(180deg, rgba(250, 250, 250, 0.96), rgba(244, 244, 245, 0.98)),
+    #f4f4f5;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.dark body {
+  color: #f4f4f5;
+  background:
+    linear-gradient(180deg, rgba(9, 9, 11, 0.96), rgba(24, 24, 27, 0.98)),
+    #09090b;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #0891b2;
+  outline-offset: 2px;
+}
+
+.table-cell {
+  @apply border-b border-zinc-200/80 px-3 py-3 align-middle text-sm text-zinc-800 transition-colors dark:border-zinc-800 dark:text-zinc-200;
+}
+
+.table-header-cell {
+  @apply sticky top-0 z-20 h-11 whitespace-nowrap border-b border-zinc-300 bg-zinc-100/95 px-3 py-0 text-left text-[10px] font-semibold uppercase leading-none text-zinc-600 backdrop-blur transition-colors dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-300;
+}
+
+.numeric-cell {
+  @apply text-right tabular-nums;
+}
+
+.table-scroll {
+  scrollbar-gutter: stable both-edges;
+}

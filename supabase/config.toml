@@ -1,0 +1,7 @@
+project_id = "equity-fortress"
+
+[functions.get-stock]
+verify_jwt = false
+
+[functions.get-stocks-batch]
+verify_jwt = false
