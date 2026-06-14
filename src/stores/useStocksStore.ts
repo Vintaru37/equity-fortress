@@ -114,6 +114,12 @@ interface PortfolioCache {
   lastUpdated: string | null;
 }
 
+interface StockResearchUpdate {
+  ticker: string;
+  moat?: Moat;
+  notes?: string;
+}
+
 function normalizeMoat(value: unknown): Moat {
   if (typeof value !== "string") {
     return "Unknown";
@@ -1154,6 +1160,48 @@ export const useStocksStore = defineStore("stocks", () => {
     void persistWatchlistPatch(ticker, { notes });
   }
 
+  async function applyResearchUpdates(
+    updates: StockResearchUpdate[],
+  ): Promise<void> {
+    const patchByTicker = new Map<string, StockResearchUpdate>();
+
+    for (const update of updates) {
+      const ticker = normalizeTickerInput(update.ticker);
+      if (!ticker || !stocks.value.some((stock) => stock.ticker === ticker)) {
+        continue;
+      }
+
+      patchByTicker.set(ticker, {
+        ticker,
+        moat: update.moat,
+        notes: update.notes,
+      });
+    }
+
+    if (patchByTicker.size === 0) {
+      return;
+    }
+
+    stocks.value = stocks.value.map((stock) => {
+      const patch = patchByTicker.get(stock.ticker);
+      if (!patch) {
+        return stock;
+      }
+
+      const next = {
+        ...stock,
+        moat: patch.moat ?? stock.moat,
+        notes: patch.notes ?? stock.notes,
+      };
+
+      return { ...next, score: calculateScore(next) };
+    });
+    recomputeSectorComparisons();
+    persistLocalState();
+    cacheActivePortfolio();
+    await persistWatchlistBulkPatch(Array.from(patchByTicker.values()));
+  }
+
   async function persistWatchlistPatch(
     ticker: string,
     patch: { moat?: Moat; notes?: string },
@@ -1182,6 +1230,65 @@ export const useStocksStore = defineStore("stocks", () => {
       error.value = requestError instanceof Error
         ? requestError.message
         : "Failed to save portfolio changes";
+    }
+  }
+
+  async function persistWatchlistBulkPatch(
+    patches: StockResearchUpdate[],
+  ): Promise<void> {
+    if (!auth.isAuthenticated) {
+      return;
+    }
+
+    const userId = requireUserId();
+    const rows = patches
+      .map((patch) => {
+        const stock = stocks.value.find((item) => item.ticker === patch.ticker);
+        if (!stock?.watchlistId) {
+          return null;
+        }
+
+        return {
+          id: stock.watchlistId,
+          user_id: userId,
+          portfolio_id: activePortfolioId.value === LOCAL_PORTFOLIO_ID
+            ? null
+            : activePortfolioId.value,
+          ticker: stock.ticker,
+          company: stock.company,
+          moat: patch.moat ?? stock.moat,
+          notes: patch.notes ?? stock.notes,
+        };
+      })
+      .filter((row): row is {
+        id: string;
+        user_id: string;
+        portfolio_id: string | null;
+        ticker: string;
+        company: string | null;
+        moat: Moat;
+        notes: string;
+      } => row !== null);
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    try {
+      const accessToken = await requireAccessToken();
+      await supabaseRequest<null>(
+        supabaseRestUrl("watchlist_stocks", { on_conflict: "id" }),
+        {
+          method: "POST",
+          accessToken,
+          prefer: "resolution=merge-duplicates,return=minimal",
+          body: rows,
+        },
+      );
+    } catch (requestError) {
+      error.value = requestError instanceof Error
+        ? requestError.message
+        : "Failed to save moat research";
     }
   }
 
@@ -1216,5 +1323,6 @@ export const useStocksStore = defineStore("stocks", () => {
     removeTicker,
     updateMoat,
     updateNotes,
+    applyResearchUpdates,
   };
 });

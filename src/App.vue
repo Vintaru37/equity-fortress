@@ -5,6 +5,7 @@ import { AlertTriangle, LoaderCircle, Search, Settings } from "@lucide/vue";
 import AddTickerForm from "@/components/AddTickerForm.vue";
 import AppTooltip from "@/components/AppTooltip.vue";
 import AuthControls from "@/components/AuthControls.vue";
+import MoatAgentPanel from "@/components/MoatAgentPanel.vue";
 import PortfolioControls from "@/components/PortfolioControls.vue";
 import RefreshButton from "@/components/RefreshButton.vue";
 import StockTable from "@/components/StockTable.vue";
@@ -85,6 +86,7 @@ function openColumns(): void {
           :loading="store.refreshing"
           @click="store.refreshAll"
         />
+        <MoatAgentPanel />
         <AppTooltip text="Customize columns">
           <button
             type="button"

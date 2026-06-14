@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "agent": "node scripts/moat-agent-server.mjs",
     "dev": "vite",
     "dev:host": "node scripts/start-vite-dev.mjs",
     "build": "vue-tsc --noEmit && vite build",

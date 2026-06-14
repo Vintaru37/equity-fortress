@@ -204,7 +204,7 @@ function hasScoreDetails(stock: StockRowData): boolean {
         </div>
       </td>
 
-      <td v-else-if="columnId === 'notes'" class="table-cell w-56 min-w-56">
+      <td v-else-if="columnId === 'notes'" class="table-cell w-72 min-w-72">
         <StockNotes
           :model-value="row.original.notes"
           :ticker="row.original.ticker"

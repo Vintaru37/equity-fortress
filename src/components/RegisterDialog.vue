@@ -60,8 +60,8 @@ async function submit(): Promise<void> {
 
   if (auth.isAuthenticated) {
     password.value = "";
-    await stocks.loadPortfolios();
     close();
+    void stocks.loadPortfolios();
   }
 }
 </script>

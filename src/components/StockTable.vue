@@ -150,7 +150,7 @@ const columnWidthClasses: Record<string, string> = {
   analystConsensus: "w-28 min-w-28",
   moat: "w-36 min-w-36",
   score: "w-28 min-w-28",
-  notes: "w-56 min-w-56",
+  notes: "w-72 min-w-72",
 };
 
 const initialColumnPrefs = readColumnPrefs();

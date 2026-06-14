@@ -45,8 +45,8 @@ async function submit(): Promise<void> {
   const success = await auth.signIn(email.value, password.value);
   if (success) {
     password.value = "";
-    await stocks.loadPortfolios();
     close();
+    void stocks.loadPortfolios();
   }
 }
 </script>

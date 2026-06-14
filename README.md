@@ -31,6 +31,50 @@ Domyslny adres Vite:
 http://localhost:5173
 ```
 
+## Lokalny Moat Agent
+
+Mini agent do notatek MOAT dziala lokalnie, poza frontendem. Nie korzysta z
+ChatGPT Plus ani platnego OpenAI API. Domyslnie pobiera najnowsze raporty SEC i
+robi szybka, konserwatywna analize zrodel. Ollama jest opcjonalne i domyslnie
+wylaczone, bo lokalne generowanie dla calego portfela potrafi byc wolne.
+Brave Search jest opcjonalny i dziala tylko po dodaniu darmowego/limitowanego
+klucza API.
+
+1. Opcjonalnie zainstaluj Ollama i pobierz model:
+
+```bash
+ollama pull llama3.1:8b
+```
+
+2. Skopiuj konfiguracje agenta:
+
+```bash
+copy .env.agent.example .env.agent.local
+```
+
+W `.env.agent.local` ustaw `SEC_USER_AGENT` na nazwe/email kontaktowy. Jezeli
+chcesz web search poza SEC, uzupelnij `BRAVE_SEARCH_API_KEY`. Jezeli chcesz
+wlaczyc lokalny model mimo wolniejszego dzialania, ustaw:
+
+```bash
+MOAT_AGENT_USE_OLLAMA=true
+```
+
+3. Uruchom agenta w osobnym terminalu:
+
+```bash
+npm run agent
+```
+
+4. Uruchom frontend:
+
+```bash
+npm run dev
+```
+
+W aplikacji przycisk z ikona agenta otwiera panel researchu. Wyniki nie zapisuja
+sie automatycznie: trzeba kliknac `Add note` albo `Add all`.
+
 Windows/background helper:
 
 ```bash
