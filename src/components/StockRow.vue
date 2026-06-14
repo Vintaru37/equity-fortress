@@ -45,6 +45,10 @@ function updateNotes(notes: string): void {
 function signedNumber(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
+
+function hasScoreDetails(stock: StockRowData): boolean {
+  return stock.sectorScoreDelta !== null || stock.scorePenalty > 0;
+}
 </script>
 
 <template>
@@ -176,7 +180,10 @@ function signedNumber(value: number): string {
       </td>
 
       <td v-else-if="columnId === 'score'" class="table-cell numeric-cell w-28 min-w-28">
-        <div class="flex flex-col items-start gap-1">
+        <div
+          class="flex flex-col items-start gap-1"
+          :class="hasScoreDetails(row.original) ? 'pt-2' : ''"
+        >
           <MetricBadge :value="row.original.score" kind="score" :decimals="0" />
           <AppTooltip
             v-if="row.original.sectorScoreDelta !== null"

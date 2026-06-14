@@ -37,11 +37,20 @@ export interface StockData {
 }
 
 export interface StockRowData extends StockData {
+  watchlistId: string | null;
   notes: string;
   isRefreshing: boolean;
   rowError: string | null;
   sectorScoreDelta: number | null;
   sectorPeerCount: number;
+}
+
+export interface Portfolio {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PersistedStocksState {

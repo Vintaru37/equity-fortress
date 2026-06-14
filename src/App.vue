@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { AlertTriangle, Search, Settings } from "@lucide/vue";
+import { AlertTriangle, LoaderCircle, Search, Settings } from "@lucide/vue";
 
 import AddTickerForm from "@/components/AddTickerForm.vue";
 import AppTooltip from "@/components/AppTooltip.vue";
+import AuthControls from "@/components/AuthControls.vue";
+import PortfolioControls from "@/components/PortfolioControls.vue";
 import RefreshButton from "@/components/RefreshButton.vue";
 import StockTable from "@/components/StockTable.vue";
 import ThemeToggle from "@/components/ThemeToggle.vue";
@@ -19,7 +21,7 @@ const stockTableRef = ref<InstanceType<typeof StockTable> | null>(null);
 const lastUpdated = computed(() => formatDateTime(store.lastUpdated));
 
 onMounted(() => {
-  void store.loadInitialStocks();
+  void store.initializeDashboard();
 });
 
 function openColumns(): void {
@@ -39,9 +41,12 @@ function openColumns(): void {
       </div>
 
       <div class="flex items-center gap-3">
+        <PortfolioControls />
+        <AuthControls />
+
         <div class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <div class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400">
-            Last Updated
+            Portfolio Updated
           </div>
           <div class="text-sm font-bold text-zinc-950 dark:text-white">
             {{ lastUpdated }}
@@ -55,7 +60,7 @@ function openColumns(): void {
     <section
       class="mb-4 flex items-start justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
     >
-      <div class="flex items-start gap-3">
+      <div class="flex flex-wrap items-start gap-3">
         <div class="relative">
           <Search
             class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
@@ -103,10 +108,11 @@ function openColumns(): void {
 
     <div
       v-if="store.loading"
-      class="mb-4 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
-      aria-label="Loading"
+      class="mb-4 flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm font-semibold text-cyan-800 dark:border-cyan-900 dark:bg-cyan-950 dark:text-cyan-200"
+      role="status"
     >
-      <div class="h-1.5 w-1/2 animate-pulse rounded-full bg-cyan-600" />
+      <LoaderCircle class="h-4 w-4 animate-spin" aria-hidden="true" />
+      Loading stocks data...
     </div>
 
     <StockTable ref="stockTableRef" />

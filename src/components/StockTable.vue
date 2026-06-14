@@ -4,12 +4,14 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   useVueTable,
-  type Column,
-  type ColumnOrderState,
-  type ColumnDef,
-  type SortingState,
-  type Updater,
-  type VisibilityState,
+} from "@tanstack/vue-table";
+import type {
+  Column,
+  ColumnDef,
+  ColumnOrderState,
+  SortingState,
+  Updater,
+  VisibilityState,
 } from "@tanstack/vue-table";
 import {
   ArrowDown,
@@ -625,7 +627,7 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
         v-if="table.getRowModel().rows.length === 0"
         class="flex h-80 items-center justify-center text-sm font-semibold text-zinc-500 dark:text-zinc-400"
       >
-        No matching stocks
+        {{ store.stocks.length === 0 ? "No stocks in this portfolio" : "No matching stocks" }}
       </div>
     </div>
   </section>

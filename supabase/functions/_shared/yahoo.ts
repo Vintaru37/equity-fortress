@@ -66,7 +66,7 @@ export async function fetchYahooHistoricalRecords(
     interval: "1d",
     events: "history",
     includeAdjustedClose: true,
-  } as Record<string, unknown>);
+  });
 
   return recordArray(history)
     .map((record) =>
@@ -88,12 +88,12 @@ export async function fetchYahooFundamentalsPayload(
       period1: from,
       type: "annual",
       module: "all",
-    } as Record<string, unknown>),
+    }),
     getYahooFinance().fundamentalsTimeSeries(ticker, {
       period1: from,
       type: "trailing",
       module: "all",
-    } as Record<string, unknown>),
+    }),
   ]);
 
   const patch: Partial<CachedStockPayload> = {};

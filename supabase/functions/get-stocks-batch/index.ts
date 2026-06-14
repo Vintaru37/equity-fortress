@@ -7,7 +7,7 @@ import {
   normalizeTickerList,
 } from "../_shared/stock-service.ts";
 
-const MAX_BATCH_TICKERS = 25;
+const MAX_BATCH_TICKERS = 50;
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {

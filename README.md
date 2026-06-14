@@ -1,8 +1,8 @@
 # Equity Fortress
 
 Equity Fortress to dashboard inwestycyjny z frontem w Vue 3 oraz backendem na
-Supabase Edge Functions. Frontend komunikuje sie wylacznie z Edge Functions.
-Dane rynkowe sa pobierane po stronie backendu przez `yahoo-finance2`.
+Supabase Edge Functions. Dane rynkowe sa pobierane po stronie backendu przez
+`yahoo-finance2`; logowanie i portfele korzystaja z Supabase Auth oraz REST.
 
 ## Stack
 
@@ -61,17 +61,21 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 ```
 
-Frontend uzywa tych wartosci do wywolywania:
+Frontend uzywa tych wartosci do:
 
 - `/functions/v1/get-stock`
 - `/functions/v1/get-stocks-batch`
+- Supabase Auth
+- Supabase REST dla portfeli i watchlisty
 
 Nie ma klienta danych rynkowych po stronie UI.
 
 ## Funkcje UI
 
-- startowa lista tickerow: `MSFT`, `META`, `GOOGL`, `AMZN`, `AVGO`, `CEG`,
-  `RKLB`, `ASTS`, `NVDA`, `MU`
+- domyslny portfel z kuratorowana lista startowa 50 tickerow
+- logowanie i rejestracja przez Supabase Auth
+- tworzenie nowych pustych portfeli dla zalogowanego uzytkownika
+- przelaczanie, zmiana nazwy i usuwanie portfeli
 - sortowanie po kazdej kolumnie
 - wybor widocznych kolumn przez checkboxy i zmiana kolejnosci kolumn
 - filtrowanie po tickerze i nazwie spolki
@@ -89,8 +93,13 @@ Nie ma klienta danych rynkowych po stronie UI.
 - `Refresh` wykonuje pelne odswiezenie cen, fundamentow, estimates, consensus
   oraz historical prices
 
-`MOAT` i `Notes` sa zapisywane lokalnie w `localStorage`. Dane rynkowe sa
-pobierane tylko przez Supabase Edge Functions.
+`MOAT` i `Notes` sa zapisywane w Supabase dla zalogowanego uzytkownika, a w
+`localStorage` w trybie niezalogowanym. Dane rynkowe sa pobierane tylko przez
+Supabase Edge Functions.
+
+Domyslne 50 tickerow to statyczna lista startowa, a nie ranking pobrany z
+Yahoo. Yahoo-backed Edge Functions pobieraja dane dla podanych tickerow, a
+ranking/score liczy aplikacja po zaladowaniu danych.
 
 ### Refresh
 
@@ -110,6 +119,11 @@ brakujaca metryka.
 
 - `src/components/StockTable.vue`
 - `src/components/StockRow.vue`
+- `src/components/AuthControls.vue`
+- `src/components/LoginDialog.vue`
+- `src/components/RegisterDialog.vue`
+- `src/components/PortfolioControls.vue`
+- `src/components/PortfolioManageDialog.vue`
 - `src/components/AddTickerForm.vue`
 - `src/components/SparklineChart.vue`
 - `src/components/MetricBadge.vue`
@@ -120,11 +134,13 @@ brakujaca metryka.
 Store:
 
 - `src/stores/useStocksStore.ts`
+- `src/stores/useAuthStore.ts`
 
 Typy i utilsy:
 
 - `src/types/stock.ts`
 - `src/utils/formatters.ts`
+- `src/utils/supabaseApi.ts`
 
 ## Sekrety Supabase
 
@@ -146,6 +162,7 @@ supabase db push
 Tworzone tabele:
 
 - `watchlist_stocks`
+- `portfolios`
 - `stock_metrics_cache`
 - `refresh_logs`
 
@@ -158,8 +175,9 @@ Dozwolone wartosci `watchlist_stocks.moat`:
 - `Unknown`
 
 Cache danych rynkowych i logi maja wlaczone RLS bez publicznych polityk. Sa
-obslugiwane przez Edge Functions na service role. `watchlist_stocks` ma polityki CRUD dla
-zalogowanego uzytkownika na jego `user_id`.
+obslugiwane przez Edge Functions na service role. `portfolios` i
+`watchlist_stocks` maja polityki CRUD dla zalogowanego uzytkownika na jego
+`user_id`.
 
 ## Edge Functions
 
@@ -195,9 +213,11 @@ Input:
 
 Output: `StockData[]`.
 
-Batch normalizuje i deduplikuje tickery oraz ogranicza request do 25 symboli.
-Jezeli jedna spolka ma problem, funkcja zwroci dla niej obiekt z polami `null`,
-a pozostale tickery beda dalej przetwarzane.
+Batch normalizuje i deduplikuje tickery oraz ogranicza pojedynczy request do
+50 symboli. To nie jest limit wielkosci portfela: frontend dzieli wieksze
+portfele na kolejne requesty po 50 tickerow. Jezeli jedna spolka ma problem,
+funkcja zwroci dla niej obiekt z polami `null`, a pozostale tickery beda dalej
+przetwarzane.
 
 ## Cache
 
