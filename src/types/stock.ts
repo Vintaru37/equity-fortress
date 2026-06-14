@@ -1,4 +1,11 @@
-export type Moat = "Excellent" | "Good" | "Average" | "Bad" | "Unknown";
+export type Moat =
+  | "Excellent"
+  | "Very Good"
+  | "Good"
+  | "Average"
+  | "Bad"
+  | "Very Bad"
+  | "Unknown";
 
 export interface ChartPoint {
   date: string;
@@ -61,8 +68,10 @@ export interface PersistedStocksState {
 
 export const MOAT_OPTIONS: Moat[] = [
   "Excellent",
+  "Very Good",
   "Good",
   "Average",
   "Bad",
+  "Very Bad",
   "Unknown",
 ];

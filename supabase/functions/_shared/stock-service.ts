@@ -1,4 +1,7 @@
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  createClient,
+  type SupabaseClient,
+} from "https://esm.sh/@supabase/supabase-js@2";
 import type {
   CachedStockPayload,
   CacheRow,
@@ -20,7 +23,15 @@ const HISTORICAL_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_PROVIDER = "yahoo-finance2";
 const CACHE_SCHEMA_VERSION = 2;
 
-const MOAT_VALUES: Moat[] = ["Excellent", "Good", "Average", "Bad", "Unknown"];
+const MOAT_VALUES: Moat[] = [
+  "Excellent",
+  "Very Good",
+  "Good",
+  "Average",
+  "Bad",
+  "Very Bad",
+  "Unknown",
+];
 
 type RefreshScope = "quote" | "full";
 
@@ -98,12 +109,13 @@ export async function loadStockData(
 
   const now = new Date();
   const rawCachedPayload = normalizePayload(cacheRow?.data_json);
-  const cacheProviderMismatch = cacheRow !== null &&
-    !isCurrentProviderPayload(rawCachedPayload);
+  const cacheProviderMismatch =
+    cacheRow !== null && !isCurrentProviderPayload(rawCachedPayload);
   const cachedPayload = cacheProviderMismatch ? {} : rawCachedPayload;
   const forceRefresh = options.forceRefresh === true;
   const refreshScope = forceRefresh ? "full" : options.refreshScope;
-  const hasAnyCache = cacheRow !== null &&
+  const hasAnyCache =
+    cacheRow !== null &&
     (hasQuotePayload(cachedPayload) ||
       hasFundamentalsPayload(cachedPayload) ||
       hasHistoricalPayload(cachedPayload));
@@ -121,13 +133,16 @@ export async function loadStockData(
     return emptyStockData(ticker, moat, latestTimestamp(cacheRow));
   }
 
-  const quoteFresh = !forceRefresh &&
+  const quoteFresh =
+    !forceRefresh &&
     hasQuotePayload(cachedPayload) &&
     isFresh(cacheRow?.quote_updated_at, QUOTE_CACHE_MS, now);
-  const fundamentalsFresh = !forceRefresh &&
+  const fundamentalsFresh =
+    !forceRefresh &&
     hasFundamentalsPayload(cachedPayload) &&
     isFresh(cacheRow?.fundamentals_updated_at, FUNDAMENTALS_CACHE_MS, now);
-  const historicalFresh = !forceRefresh &&
+  const historicalFresh =
+    !forceRefresh &&
     hasHistoricalPayload(cachedPayload) &&
     isFresh(cacheRow?.historical_updated_at, HISTORICAL_CACHE_MS, now);
 
@@ -135,18 +150,22 @@ export async function loadStockData(
     return composeStockData(ticker, cachedPayload, moat, cacheRow);
   }
 
-  const nextPayload: CachedStockPayload = forceRefresh ? {} : { ...cachedPayload };
+  const nextPayload: CachedStockPayload = forceRefresh
+    ? {}
+    : { ...cachedPayload };
   const timestampPatch: Partial<CacheRow> = {};
   const allErrors: string[] = [];
 
   const refreshQuote = refreshScope === "quote" || !quoteFresh;
-  const refreshFundamentals = refreshScope === "quote" ? false : !fundamentalsFresh;
+  const refreshFundamentals =
+    refreshScope === "quote" ? false : !fundamentalsFresh;
   const refreshHistorical = refreshScope === "quote" ? false : !historicalFresh;
 
   if (refreshQuote) {
-    const result = refreshScope === "quote" && hasAnyCache
-      ? await fetchSingleQuoteRefreshGroup(ticker)
-      : await fetchQuoteGroup(ticker);
+    const result =
+      refreshScope === "quote" && hasAnyCache
+        ? await fetchSingleQuoteRefreshGroup(ticker)
+        : await fetchQuoteGroup(ticker);
     Object.assign(nextPayload, result.patch);
     allErrors.push(...result.errors);
     if (result.hasSuccess) {
@@ -214,7 +233,8 @@ export async function loadStocksBatchData(
             cacheOnly: options.cacheOnly ?? options.refreshScope !== "full",
           });
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           console.error("Batch stock load failed", { ticker, message });
           return emptyStockData(ticker);
         }
@@ -235,7 +255,9 @@ export async function loadStocksBatchData(
       continue;
     }
 
-    const ticker = normalizeTicker(firstString(quote, ["symbol", "ticker"]) ?? "");
+    const ticker = normalizeTicker(
+      firstString(quote, ["symbol", "ticker"]) ?? "",
+    );
     if (ticker) {
       quoteEntries.push([ticker, quote]);
     }
@@ -261,7 +283,12 @@ export async function loadStocksBatchData(
             cacheRow,
             { quote_updated_at: nowIso },
           );
-          return composeStockData(ticker, payload, moat, updatedRow ?? cacheRow);
+          return composeStockData(
+            ticker,
+            payload,
+            moat,
+            updatedRow ?? cacheRow,
+          );
         }
 
         return cacheRow
@@ -403,7 +430,12 @@ async function readCacheRow(
     .maybeSingle();
 
   if (error) {
-    await logRefresh(supabase, ticker, "error", `Cache read failed: ${error.message}`);
+    await logRefresh(
+      supabase,
+      ticker,
+      "error",
+      `Cache read failed: ${error.message}`,
+    );
     throw error;
   }
 
@@ -460,12 +492,16 @@ async function upsertCacheRow(
   const row = {
     ticker,
     data_json: payload,
-    quote_updated_at: timestampPatch.quote_updated_at ??
-      previousRow?.quote_updated_at ?? null,
-    fundamentals_updated_at: timestampPatch.fundamentals_updated_at ??
-      previousRow?.fundamentals_updated_at ?? null,
-    historical_updated_at: timestampPatch.historical_updated_at ??
-      previousRow?.historical_updated_at ?? null,
+    quote_updated_at:
+      timestampPatch.quote_updated_at ?? previousRow?.quote_updated_at ?? null,
+    fundamentals_updated_at:
+      timestampPatch.fundamentals_updated_at ??
+      previousRow?.fundamentals_updated_at ??
+      null,
+    historical_updated_at:
+      timestampPatch.historical_updated_at ??
+      previousRow?.historical_updated_at ??
+      null,
   };
 
   const { data, error } = await supabase
@@ -475,7 +511,12 @@ async function upsertCacheRow(
     .maybeSingle();
 
   if (error) {
-    await logRefresh(supabase, ticker, "error", `Cache upsert failed: ${error.message}`);
+    await logRefresh(
+      supabase,
+      ticker,
+      "error",
+      `Cache upsert failed: ${error.message}`,
+    );
     throw error;
   }
 
@@ -488,10 +529,29 @@ async function fetchQuoteGroup(ticker: string): Promise<GroupResult> {
     return {
       quote: record,
       profile: compactPayloadRecord({
-        companyName: firstString(record, ["companyName", "name", "longName", "shortName"]),
-        company: firstString(record, ["companyName", "name", "longName", "shortName"]),
-        name: firstString(record, ["companyName", "name", "longName", "shortName"]),
-        price: firstNumber(record, ["price", "currentPrice", "regularMarketPrice"]),
+        companyName: firstString(record, [
+          "companyName",
+          "name",
+          "longName",
+          "shortName",
+        ]),
+        company: firstString(record, [
+          "companyName",
+          "name",
+          "longName",
+          "shortName",
+        ]),
+        name: firstString(record, [
+          "companyName",
+          "name",
+          "longName",
+          "shortName",
+        ]),
+        price: firstNumber(record, [
+          "price",
+          "currentPrice",
+          "regularMarketPrice",
+        ]),
         beta: firstNumber(record, ["beta"]),
       }),
     };
@@ -500,11 +560,16 @@ async function fetchQuoteGroup(ticker: string): Promise<GroupResult> {
   return groupResult([quote]);
 }
 
-async function fetchSingleQuoteRefreshGroup(ticker: string): Promise<GroupResult> {
+async function fetchSingleQuoteRefreshGroup(
+  ticker: string,
+): Promise<GroupResult> {
   const result = await fetchBatchQuoteGroup([ticker]);
-  const quote = result.patch.quotes?.find((record) =>
-    normalizeTicker(firstString(record, ["symbol", "ticker"]) ?? "") === ticker
-  ) ?? null;
+  const quote =
+    result.patch.quotes?.find(
+      (record) =>
+        normalizeTicker(firstString(record, ["symbol", "ticker"]) ?? "") ===
+        ticker,
+    ) ?? null;
 
   return {
     patch: quote ? { quote } : {},
@@ -525,7 +590,7 @@ async function fetchFundamentalsGroup(ticker: string): Promise<GroupResult> {
   const from = toIsoDate(addDays(new Date(), -(7 * 365 + 21)));
   const [series, summary] = await Promise.all([
     safePatch("fundamentals-time-series", () =>
-      fetchYahooFundamentalsPayload(ticker, from)
+      fetchYahooFundamentalsPayload(ticker, from),
     ),
     safePatch("quote-summary", () => fetchYahooSummaryPayload(ticker)),
   ]);
@@ -577,7 +642,9 @@ function groupResult(results: EndpointResult[]): GroupResult {
   return { patch, errors, hasSuccess };
 }
 
-function normalizePayload(payload: CachedStockPayload | null | undefined): CachedStockPayload {
+function normalizePayload(
+  payload: CachedStockPayload | null | undefined,
+): CachedStockPayload {
   if (!payload || typeof payload !== "object") {
     return {};
   }
@@ -586,8 +653,10 @@ function normalizePayload(payload: CachedStockPayload | null | undefined): Cache
 }
 
 function isCurrentProviderPayload(payload: CachedStockPayload): boolean {
-  return payload._meta?.provider === CACHE_PROVIDER &&
-    payload._meta?.schemaVersion === CACHE_SCHEMA_VERSION;
+  return (
+    payload._meta?.provider === CACHE_PROVIDER &&
+    payload._meta?.schemaVersion === CACHE_SCHEMA_VERSION
+  );
 }
 
 function stampCachePayload(payload: CachedStockPayload, now: Date): void {
@@ -618,7 +687,8 @@ export function composeStockData(
 ): StockData {
   const profile = payload.profile ?? null;
   const quote = payload.quote ?? null;
-  const incomeTtm = payload.incomeStatementTtm ?? first(payload.incomeStatements);
+  const incomeTtm =
+    payload.incomeStatementTtm ?? first(payload.incomeStatements);
   const latestIncomeGrowth = first(payload.incomeStatementGrowth);
   const latestIncome = first(payload.incomeStatements);
   const previousIncome = second(payload.incomeStatements);
@@ -628,18 +698,21 @@ export function composeStockData(
   const ratiosTtm = payload.ratiosTtm ?? null;
   const keyMetricsTtm = payload.keyMetricsTtm ?? null;
 
-  const currentPrice = firstNumber(
-    quote,
-    ["price", "currentPrice", "regularMarketPrice"],
-  ) ?? firstNumber(profile, ["price", "stockPrice"]);
+  const currentPrice =
+    firstNumber(quote, ["price", "currentPrice", "regularMarketPrice"]) ??
+    firstNumber(profile, ["price", "stockPrice"]);
 
-  const revenue = firstNumber(incomeTtm, ["revenue"]) ??
+  const revenue =
+    firstNumber(incomeTtm, ["revenue"]) ??
     firstNumber(latestIncome, ["revenue"]);
-  const grossProfit = firstNumber(incomeTtm, ["grossProfit"]) ??
+  const grossProfit =
+    firstNumber(incomeTtm, ["grossProfit"]) ??
     firstNumber(latestIncome, ["grossProfit"]);
-  const operatingIncome = firstNumber(incomeTtm, ["operatingIncome"]) ??
+  const operatingIncome =
+    firstNumber(incomeTtm, ["operatingIncome"]) ??
     firstNumber(latestIncome, ["operatingIncome"]);
-  const ebit = firstNumber(incomeTtm, ["ebit"]) ??
+  const ebit =
+    firstNumber(incomeTtm, ["ebit"]) ??
     operatingIncome ??
     firstNumber(latestIncome, ["ebit"]);
   const totalAssets = firstNumber(latestBalance, ["totalAssets"]);
@@ -647,7 +720,8 @@ export function composeStockData(
     "totalCurrentLiabilities",
     "totalCurrentLiability",
   ]);
-  const totalDebt = firstNumber(latestBalance, ["totalDebt"]) ??
+  const totalDebt =
+    firstNumber(latestBalance, ["totalDebt"]) ??
     firstNumber(latestBalance, ["totalDebtAndCapitalLeaseObligations"]) ??
     sumPresent([
       firstNumber(latestBalance, [
@@ -684,96 +758,135 @@ export function composeStockData(
     "cashAndShortTermInvestments",
     "cashAndCashEquivalentsAndShortTermInvestments",
   ]);
-  const netDebt = firstNumber(latestBalance, ["netDebt"]) ??
+  const netDebt =
+    firstNumber(latestBalance, ["netDebt"]) ??
     firstNumber(keyMetricsTtm, ["netDebt"]) ??
     subtractNullable(totalDebt, cashAndEquivalents);
-  const freeCashFlow = firstNumber(cashFlowTtm, ["freeCashFlow"]) ??
+  const freeCashFlow =
+    firstNumber(cashFlowTtm, ["freeCashFlow"]) ??
     firstNumber(latestCashFlow, ["freeCashFlow"]) ??
     freeCashFlowFromCfoAndCapex(
-      firstNumber(cashFlowTtm, ["operatingCashFlow", "netCashProvidedByOperatingActivities"]) ??
-        firstNumber(latestCashFlow, ["operatingCashFlow", "netCashProvidedByOperatingActivities"]),
+      firstNumber(cashFlowTtm, [
+        "operatingCashFlow",
+        "netCashProvidedByOperatingActivities",
+      ]) ??
+        firstNumber(latestCashFlow, [
+          "operatingCashFlow",
+          "netCashProvidedByOperatingActivities",
+        ]),
       firstNumber(cashFlowTtm, ["capitalExpenditure", "capitalExpenditures"]) ??
-        firstNumber(latestCashFlow, ["capitalExpenditure", "capitalExpenditures"]),
+        firstNumber(latestCashFlow, [
+          "capitalExpenditure",
+          "capitalExpenditures",
+        ]),
     );
-  const epsTtm = firstNumber(incomeTtm, ["eps", "epsDiluted", "epsdiluted"]) ??
-    firstNumber(keyMetricsTtm, ["netIncomePerShareTTM", "epsTTM", "trailingEps"]) ??
+  const epsTtm =
+    firstNumber(incomeTtm, ["eps", "epsDiluted", "epsdiluted"]) ??
+    firstNumber(keyMetricsTtm, [
+      "netIncomePerShareTTM",
+      "epsTTM",
+      "trailingEps",
+    ]) ??
     firstNumber(quote, ["eps", "epsTrailingTwelveMonths", "trailingEps"]);
-  const ebitdaTtm = firstNumber(incomeTtm, ["ebitda", "EBITDA"]) ??
+  const ebitdaTtm =
+    firstNumber(incomeTtm, ["ebitda", "EBITDA"]) ??
     firstNumber(keyMetricsTtm, ["ebitdaTTM", "ebitda"]);
   const latestEps = epsFromIncome(latestIncome);
   const previousEps = epsFromIncome(previousIncome);
 
-  const grossMargin = percentageRatio(grossProfit, revenue) ??
-    asPercent(firstNumber(ratiosTtm, [
-      "grossProfitMarginTTM",
-      "grossProfitMargin",
-      "grossMarginTTM",
-    ]));
-  const operatingMargin = percentageRatio(operatingIncome, revenue) ??
-    asPercent(firstNumber(ratiosTtm, [
-      "operatingProfitMarginTTM",
-      "operatingProfitMargin",
-      "operatingMarginTTM",
-    ]));
-  const roce = percentageRatioPositiveDenominator(
-    ebit,
-    subtractNullable(totalAssets, totalCurrentLiabilities),
-  ) ?? asPercent(firstNumber(keyMetricsTtm, [
-    "returnOnCapitalEmployedTTM",
-    "roceTTM",
-  ]));
-  const fcfMargin = percentageRatio(freeCashFlow, revenue) ??
-    asPercent(firstNumber(ratiosTtm, [
-      "freeCashFlowMarginTTM",
-      "freeCashFlowToSalesTTM",
-      "fcfMarginTTM",
-    ]));
-  const reportedPe = positiveNumber(firstNumber(ratiosTtm, [
-    "priceEarningsRatioTTM",
-    "peRatioTTM",
-    "priceToEarningsRatioTTM",
-  ])) ?? positiveNumber(firstNumber(quote, ["pe", "peRatio", "trailingPE"]));
+  const grossMargin =
+    percentageRatio(grossProfit, revenue) ??
+    asPercent(
+      firstNumber(ratiosTtm, [
+        "grossProfitMarginTTM",
+        "grossProfitMargin",
+        "grossMarginTTM",
+      ]),
+    );
+  const operatingMargin =
+    percentageRatio(operatingIncome, revenue) ??
+    asPercent(
+      firstNumber(ratiosTtm, [
+        "operatingProfitMarginTTM",
+        "operatingProfitMargin",
+        "operatingMarginTTM",
+      ]),
+    );
+  const roce =
+    percentageRatioPositiveDenominator(
+      ebit,
+      subtractNullable(totalAssets, totalCurrentLiabilities),
+    ) ??
+    asPercent(
+      firstNumber(keyMetricsTtm, ["returnOnCapitalEmployedTTM", "roceTTM"]),
+    );
+  const fcfMargin =
+    percentageRatio(freeCashFlow, revenue) ??
+    asPercent(
+      firstNumber(ratiosTtm, [
+        "freeCashFlowMarginTTM",
+        "freeCashFlowToSalesTTM",
+        "fcfMarginTTM",
+      ]),
+    );
+  const reportedPe =
+    positiveNumber(
+      firstNumber(ratiosTtm, [
+        "priceEarningsRatioTTM",
+        "peRatioTTM",
+        "priceToEarningsRatioTTM",
+      ]),
+    ) ?? positiveNumber(firstNumber(quote, ["pe", "peRatio", "trailingPE"]));
   const pe = reportedPe ?? priceEarningsRatio(currentPrice, epsTtm);
-  const forwardEps = estimatedNextYearEps(payload.estimates ?? []) ??
+  const forwardEps =
+    estimatedNextYearEps(payload.estimates ?? []) ??
     firstNumber(keyMetricsTtm, ["forwardEps"]) ??
     firstNumber(quote, ["epsForward"]);
-  const reportedForwardPe = positiveNumber(firstNumber(keyMetricsTtm, [
-    "forwardPE",
-    "forwardPe",
-  ])) ?? positiveNumber(firstNumber(quote, ["forwardPE", "forwardPe"]));
-  const forwardPe = priceEarningsRatio(currentPrice, forwardEps) ?? reportedForwardPe;
-  const revenueGrowth = growthPercent(
-    firstNumber(latestIncome, ["revenue"]),
-    firstNumber(previousIncome, ["revenue"]),
-  ) ?? asPercent(firstNumber(latestIncomeGrowth, [
-    "growthRevenue",
-    "revenueGrowth",
-    "growthRevenueTTM",
-  ])) ?? asPercent(firstNumber(ratiosTtm, ["revenueGrowthTTM"]));
-  const epsGrowth = growthPercentPositiveBase(latestEps, previousEps) ??
-    asPercent(firstNumber(latestIncomeGrowth, [
-      "growthEPS",
-      "growthEPSDiluted",
-      "epsGrowth",
-      "epsdilutedGrowth",
-    ])) ??
+  const reportedForwardPe =
+    positiveNumber(firstNumber(keyMetricsTtm, ["forwardPE", "forwardPe"])) ??
+    positiveNumber(firstNumber(quote, ["forwardPE", "forwardPe"]));
+  const forwardPe =
+    priceEarningsRatio(currentPrice, forwardEps) ?? reportedForwardPe;
+  const revenueGrowth =
+    growthPercent(
+      firstNumber(latestIncome, ["revenue"]),
+      firstNumber(previousIncome, ["revenue"]),
+    ) ??
+    asPercent(
+      firstNumber(latestIncomeGrowth, [
+        "growthRevenue",
+        "revenueGrowth",
+        "growthRevenueTTM",
+      ]),
+    ) ??
+    asPercent(firstNumber(ratiosTtm, ["revenueGrowthTTM"]));
+  const epsGrowth =
+    growthPercentPositiveBase(latestEps, previousEps) ??
+    asPercent(
+      firstNumber(latestIncomeGrowth, [
+        "growthEPS",
+        "growthEPSDiluted",
+        "epsGrowth",
+        "epsdilutedGrowth",
+      ]),
+    ) ??
     asPercent(firstNumber(ratiosTtm, ["epsGrowthTTM"])) ??
     growthPercentPositiveBase(forwardEps, epsTtm);
-  const reportedPeg = positiveNumber(firstNumber(keyMetricsTtm, [
-    "pegRatioTTM",
-    "pegRatio",
-  ])) ?? positiveNumber(firstNumber(ratiosTtm, [
-    "priceEarningsToGrowthRatioTTM",
-    "pegRatioTTM",
-  ]));
-  const peg = reportedPeg ??
-    pegFromPeAndGrowth(pe, epsGrowth);
-  const debtToEquity = dividePositiveDenominator(totalDebt, totalEquity) ??
-    nonNegativeNumber(firstNumber(ratiosTtm, [
-      "debtEquityRatioTTM",
-      "debtToEquityRatioTTM",
-      "debtToEquity",
-    ]));
+  const reportedPeg =
+    positiveNumber(firstNumber(keyMetricsTtm, ["pegRatioTTM", "pegRatio"])) ??
+    positiveNumber(
+      firstNumber(ratiosTtm, ["priceEarningsToGrowthRatioTTM", "pegRatioTTM"]),
+    );
+  const peg = reportedPeg ?? pegFromPeAndGrowth(pe, epsGrowth);
+  const debtToEquity =
+    dividePositiveDenominator(totalDebt, totalEquity) ??
+    nonNegativeNumber(
+      firstNumber(ratiosTtm, [
+        "debtEquityRatioTTM",
+        "debtToEquityRatioTTM",
+        "debtToEquity",
+      ]),
+    );
   const netDebtToEbitda = dividePositiveDenominator(netDebt, ebitdaTtm);
 
   const historical = normalizeHistoricalPoints(payload.historical ?? []);
@@ -786,7 +899,8 @@ export function composeStockData(
 
   const stockData: StockData = {
     ticker,
-    company: firstString(profile, ["companyName", "company", "name"]) ??
+    company:
+      firstString(profile, ["companyName", "company", "name"]) ??
       firstString(quote, ["name", "companyName"]),
     currentPrice: roundNumber(currentPrice),
     oneYearChart: performance.oneYearChart,
@@ -806,7 +920,9 @@ export function composeStockData(
     revenueGrowth: roundNumber(revenueGrowth),
     epsGrowth: roundNumber(epsGrowth),
     debtToEquity: roundNumber(debtToEquity),
-    beta: roundNumber(firstNumber(profile, ["beta"]) ?? firstNumber(quote, ["beta"])),
+    beta: roundNumber(
+      firstNumber(profile, ["beta"]) ?? firstNumber(quote, ["beta"]),
+    ),
     sector: firstString(profile, ["sector"]),
     industry: firstString(profile, ["industry"]),
     moat,
@@ -826,45 +942,63 @@ export function calculateScore(data: StockData): number | null {
     points: number | null;
     missingCredit?: boolean;
   }> = [
-    { weight: 20, points: scoreThreshold(data.roce, [
-      [40, 20],
-      [30, 18],
-      [20, 16],
-      [15, 13],
-      [10, 9],
-      [0, 5],
-    ]) },
-    { weight: 7.5, points: scoreThreshold(data.grossMargin, [
-      [70, 7.5],
-      [60, 6],
-      [45, 3.75],
-      [0, 1.5],
-    ]) },
-    { weight: 7.5, points: scoreThreshold(data.operatingMargin, [
-      [35, 7.5],
-      [25, 6],
-      [15, 3.75],
-      [0, 2.25],
-    ]) },
-    { weight: 10, points: scoreThreshold(data.epsGrowth, [
-      [20, 10],
-      [15, 8],
-      [10, 6],
-      [5, 4],
-      [0, 2],
-    ]) },
-    { weight: 10, points: scoreThreshold(data.fcfMargin, [
-      [25, 10],
-      [20, 8],
-      [10, 5],
-      [0, 3],
-    ]) },
-    { weight: 5, points: scoreThreshold(data.revenueGrowth, [
-      [15, 5],
-      [10, 4],
-      [5, 3],
-      [0, 1],
-    ]) },
+    {
+      weight: 20,
+      points: scoreThreshold(data.roce, [
+        [40, 20],
+        [30, 18],
+        [20, 16],
+        [15, 13],
+        [10, 9],
+        [0, 5],
+      ]),
+    },
+    {
+      weight: 7.5,
+      points: scoreThreshold(data.grossMargin, [
+        [70, 7.5],
+        [60, 6],
+        [45, 3.75],
+        [0, 1.5],
+      ]),
+    },
+    {
+      weight: 7.5,
+      points: scoreThreshold(data.operatingMargin, [
+        [35, 7.5],
+        [25, 6],
+        [15, 3.75],
+        [0, 2.25],
+      ]),
+    },
+    {
+      weight: 10,
+      points: scoreThreshold(data.epsGrowth, [
+        [20, 10],
+        [15, 8],
+        [10, 6],
+        [5, 4],
+        [0, 2],
+      ]),
+    },
+    {
+      weight: 10,
+      points: scoreThreshold(data.fcfMargin, [
+        [25, 10],
+        [20, 8],
+        [10, 5],
+        [0, 3],
+      ]),
+    },
+    {
+      weight: 5,
+      points: scoreThreshold(data.revenueGrowth, [
+        [15, 5],
+        [10, 4],
+        [5, 3],
+        [0, 1],
+      ]),
+    },
     { weight: 15, points: moatScore(data.moat), missingCredit: false },
     { weight: 10, points: valuationScore(data.peg, data.pe) },
     { weight: 10, points: debtScore(data.netDebtToEbitda, data.debtToEquity) },
@@ -963,11 +1097,15 @@ function moatScore(moat: Moat): number {
   switch (moat) {
     case "Excellent":
       return 15;
-    case "Good":
+    case "Very Good":
       return 12;
+    case "Good":
+      return 9;
     case "Average":
-      return 8;
+      return 6;
     case "Bad":
+      return 3;
+    case "Very Bad":
       return 0;
     case "Unknown":
       return 3;
@@ -1040,13 +1178,16 @@ function estimatedNextYearEps(estimates: JsonRecord[]): number | null {
   const sorted = [...estimates].sort((a, b) =>
     String(a.date ?? a.fiscalDateEnding ?? "").localeCompare(
       String(b.date ?? b.fiscalDateEnding ?? ""),
-    )
+    ),
   );
   const nextYear = new Date().getUTCFullYear() + 1;
-  const next = sorted.find((estimate) => {
-    const date = String(estimate.date ?? estimate.fiscalDateEnding ?? "");
-    return Number(date.slice(0, 4)) >= nextYear;
-  }) ?? sorted[1] ?? sorted[0];
+  const next =
+    sorted.find((estimate) => {
+      const date = String(estimate.date ?? estimate.fiscalDateEnding ?? "");
+      return Number(date.slice(0, 4)) >= nextYear;
+    }) ??
+    sorted[1] ??
+    sorted[0];
 
   const average = firstNumber(next, [
     "estimatedEpsAvg",
@@ -1090,10 +1231,26 @@ function calculatePerformance(points: Array<{ date: string; close: number }>) {
     ...points.filter((point) => point.date >= toIsoDate(oneYearAgo)),
   );
 
-  result.performance1W = performanceFromStart(points, end, addDays(endDate, -7));
-  result.performance1Y = performanceFromStart(points, end, addDays(endDate, -365));
-  result.performance3Y = performanceFromStart(points, end, addDays(endDate, -(3 * 365)));
-  result.performance5Y = performanceFromStart(points, end, addDays(endDate, -(5 * 365)));
+  result.performance1W = performanceFromStart(
+    points,
+    end,
+    addDays(endDate, -7),
+  );
+  result.performance1Y = performanceFromStart(
+    points,
+    end,
+    addDays(endDate, -365),
+  );
+  result.performance3Y = performanceFromStart(
+    points,
+    end,
+    addDays(endDate, -(3 * 365)),
+  );
+  result.performance5Y = performanceFromStart(
+    points,
+    end,
+    addDays(endDate, -(5 * 365)),
+  );
 
   return result;
 }
@@ -1164,7 +1321,8 @@ function firstNumber(
 }
 
 function epsFromIncome(record: JsonRecord | null | undefined): number | null {
-  return firstNumber(record, ["eps", "epsDiluted", "epsdiluted"]) ??
+  return (
+    firstNumber(record, ["eps", "epsDiluted", "epsdiluted"]) ??
     divideNullable(
       firstNumber(record, ["netIncome"]),
       firstNumber(record, [
@@ -1172,12 +1330,14 @@ function epsFromIncome(record: JsonRecord | null | undefined): number | null {
         "weightedAverageShsOutDiluted",
         "weightedAverageShsOut",
       ]),
-    );
+    )
+  );
 }
 
 function sumPresent(values: Array<number | null>): number | null {
-  const numericValues = values
-    .filter((value): value is number => value !== null);
+  const numericValues = values.filter(
+    (value): value is number => value !== null,
+  );
 
   return numericValues.length > 0
     ? numericValues.reduce((sum, value) => sum + value, 0)
@@ -1331,7 +1491,12 @@ function pegFromPeAndGrowth(
   pe: number | null,
   epsGrowthPercent: number | null,
 ): number | null {
-  if (pe === null || pe <= 0 || epsGrowthPercent === null || epsGrowthPercent <= 0) {
+  if (
+    pe === null ||
+    pe <= 0 ||
+    epsGrowthPercent === null ||
+    epsGrowthPercent <= 0
+  ) {
     return null;
   }
 
@@ -1390,15 +1555,15 @@ function hasQuotePayload(payload: CachedStockPayload): boolean {
 function hasFundamentalsPayload(payload: CachedStockPayload): boolean {
   return Boolean(
     payload.incomeStatements ||
-      payload.incomeStatementGrowth ||
-      payload.incomeStatementTtm ||
-      payload.balanceSheets ||
-      payload.cashFlows ||
-      payload.cashFlowTtm ||
-      payload.ratiosTtm ||
-      payload.keyMetricsTtm ||
-      payload.estimates ||
-      payload.gradesConsensus,
+    payload.incomeStatementGrowth ||
+    payload.incomeStatementTtm ||
+    payload.balanceSheets ||
+    payload.cashFlows ||
+    payload.cashFlowTtm ||
+    payload.ratiosTtm ||
+    payload.keyMetricsTtm ||
+    payload.estimates ||
+    payload.gradesConsensus,
   );
 }
 

@@ -239,9 +239,11 @@ Tworzone tabele:
 Dozwolone wartosci `watchlist_stocks.moat`:
 
 - `Excellent`
+- `Very Good`
 - `Good`
 - `Average`
 - `Bad`
+- `Very Bad`
 - `Unknown`
 
 Cache danych rynkowych i logi maja wlaczone RLS bez publicznych polityk. Sa

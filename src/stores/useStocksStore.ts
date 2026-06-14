@@ -130,9 +130,11 @@ function normalizeMoat(value: unknown): Moat {
   }
 
   if (value === "Very Wide") return "Excellent";
+  if (value === "Very Good") return "Very Good";
   if (value === "Wide") return "Good";
   if (value === "Narrow") return "Average";
   if (value === "None") return "Bad";
+  if (value === "Very Bad") return "Very Bad";
   return "Unknown";
 }
 
@@ -1160,6 +1162,17 @@ export const useStocksStore = defineStore("stocks", () => {
     void persistWatchlistPatch(ticker, { notes });
   }
 
+  async function clearAllNotes(): Promise<void> {
+    const updates = stocks.value
+      .filter((stock) => stock.notes.trim() !== "")
+      .map((stock) => ({
+        ticker: stock.ticker,
+        notes: "",
+      }));
+
+    await applyResearchUpdates(updates);
+  }
+
   async function applyResearchUpdates(
     updates: StockResearchUpdate[],
   ): Promise<void> {
@@ -1323,6 +1336,7 @@ export const useStocksStore = defineStore("stocks", () => {
     removeTicker,
     updateMoat,
     updateNotes,
+    clearAllNotes,
     applyResearchUpdates,
   };
 });

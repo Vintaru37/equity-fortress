@@ -20,13 +20,23 @@ const FETCH_TIMEOUT_MS = numberFromEnv("MOAT_AGENT_FETCH_TIMEOUT_MS", 10000);
 const STOCK_TIMEOUT_MS = numberFromEnv("MOAT_AGENT_STOCK_TIMEOUT_MS", 25000);
 const SOURCE_TEXT_LIMIT = numberFromEnv("MOAT_AGENT_SOURCE_TEXT_LIMIT", 1500000);
 
-const MOAT_VALUES = new Set(["Excellent", "Good", "Average", "Bad", "Unknown"]);
+const MOAT_VALUES = new Set([
+  "Excellent",
+  "Very Good",
+  "Good",
+  "Average",
+  "Bad",
+  "Very Bad",
+  "Unknown",
+]);
 const MOAT_RANK = {
-  Bad: 0,
-  Unknown: 1,
-  Average: 2,
-  Good: 3,
-  Excellent: 4,
+  "Very Bad": 0,
+  Bad: 1,
+  Unknown: 2,
+  Average: 3,
+  Good: 4,
+  "Very Good": 5,
+  Excellent: 6,
 };
 const ANNUAL_FORMS = new Set(["10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"]);
 const QUARTERLY_FORMS = new Set(["10-Q", "10-Q/A", "6-K", "6-K/A"]);
@@ -531,9 +541,9 @@ Rules:
 - Use only the sources below.
 - Prefer dated filings and freshness-filtered web results.
 - If a source has no exact date, treat it as weak support.
-- Classify moat on this app scale: Excellent, Good, Average, Bad, Unknown.
+- Classify moat on this app scale: Excellent, Very Good, Good, Average, Bad, Very Bad, Unknown.
 - Be very conservative. "Excellent" is rare and means an unusually durable, very hard-to-displace moat with strong evidence from sources.
-- Use "Good" for strong but contested advantages, "Average" for ordinary or uncertain advantages, "Bad" for weak/commodity-like positioning, and "Unknown" when evidence is thin.
+- Use "Very Good" for clearly strong moats that are not quite exceptional, "Good" for solid but contested advantages, "Average" for ordinary or uncertain advantages, "Bad" for weak positioning, "Very Bad" for commodity-like/no-barrier businesses, and "Unknown" when evidence is thin.
 - Do not treat generic mentions of brand, scale, IP, or competition as moat evidence unless the source clearly links them to pricing power, retention, barriers to entry, or durable advantage versus competitors.
 - AMD-style semiconductor competition should not be "Excellent" unless the sources show a truly structural and durable edge.
 - Keep notes human and specific. No phrases like "shows X based on the latest available source set".
@@ -546,7 +556,7 @@ ${sourceBlock}
 
 JSON shape:
 {
-  "moat": "Excellent | Good | Average | Bad | Unknown",
+  "moat": "Excellent | Very Good | Good | Average | Bad | Very Bad | Unknown",
   "confidence": "High | Medium | Low",
   "summary": "one natural sentence explaining the rating",
   "keyPoints": ["short human point with source ref like [1]", "another point"],
@@ -630,17 +640,21 @@ function evaluateEvidence(stock, sources) {
 
   let recommendedMoat = "Unknown";
   if (
-    adjustedScore >= 9 &&
+    adjustedScore >= 11 &&
     highQualitySignals.length >= 2 &&
     hasFiling &&
     hasRecentDatedSource &&
     matchedRisks.length <= 2
   ) {
     recommendedMoat = "Excellent";
+  } else if (adjustedScore >= 9 && highQualitySignals.length >= 2) {
+    recommendedMoat = "Very Good";
   } else if (adjustedScore >= 6 && highQualitySignals.length >= 1) {
     recommendedMoat = "Good";
   } else if (adjustedScore >= 2) {
     recommendedMoat = "Average";
+  } else if (weakMoatHits.length >= 2) {
+    recommendedMoat = "Very Bad";
   } else if (weakMoatHits.length > 0) {
     recommendedMoat = "Bad";
   }

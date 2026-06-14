@@ -1,4 +1,11 @@
-export type Moat = "Excellent" | "Good" | "Average" | "Bad" | "Unknown";
+export type Moat =
+  | "Excellent"
+  | "Very Good"
+  | "Good"
+  | "Average"
+  | "Bad"
+  | "Very Bad"
+  | "Unknown";
 
 export interface StockData {
   ticker: string;

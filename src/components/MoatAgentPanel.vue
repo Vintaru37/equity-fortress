@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Bot,
   Check,
+  Copy,
   ExternalLink,
   FileText,
   LoaderCircle,
@@ -49,6 +50,7 @@ const health = ref<MoatAgentHealth | null>(null);
 const researchedAt = ref<string | null>(null);
 const results = ref<MoatAgentResult[]>([]);
 const appliedTickers = ref<string[]>([]);
+const promptCopied = ref(false);
 
 const candidateStocks = computed(() =>
   scope.value === "filtered" ? store.filteredStocks : store.stocks
@@ -119,6 +121,64 @@ async function runResearch(): Promise<void> {
   } finally {
     loading.value = false;
   }
+}
+
+async function copyPortfolioPrompt(): Promise<void> {
+  const prompt = buildPortfolioMoatPrompt();
+
+  try {
+    await navigator.clipboard.writeText(prompt);
+    promptCopied.value = true;
+    window.setTimeout(() => {
+      promptCopied.value = false;
+    }, 1800);
+  } catch (_error) {
+    error.value = "Could not copy prompt to clipboard";
+  }
+}
+
+function buildPortfolioMoatPrompt(): string {
+  const stockLines = store.stocks
+    .slice()
+    .sort((left, right) => {
+      const leftScore = left.score ?? -1;
+      const rightScore = right.score ?? -1;
+      return rightScore - leftScore || left.ticker.localeCompare(right.ticker);
+    })
+    .map((stock) => {
+      const company = stock.company ?? "Company unknown";
+      const notes = stock.notes.trim()
+        ? ` | current notes: ${clipPromptText(stock.notes, 180)}`
+        : "";
+
+      const score = stock.score === null ? "N/A" : String(stock.score);
+      return `- ${stock.ticker} | ${company} | score: ${score} | current app moat: ${stock.moat}${notes}`;
+    })
+    .join("\n");
+
+  return [
+    "Research the economic moat for every stock below. Use recent sources where possible, especially latest annual reports, quarterly reports, earnings calls, investor relations pages, and reputable recent articles.",
+    "",
+    "Use exactly one moat rating per stock from this app scale: Very Bad, Bad, Average, Good, Very Good, Excellent, Unknown.",
+    "Be conservative: Excellent should be rare, Very Good should require strong durable evidence, and normal competitive-risk language should not automatically mean Bad.",
+    "",
+    "For every stock, return:",
+    "Ticker | Company | Moat rating | 3-4 very short notes",
+    "",
+    "Keep the notes human, specific, and short. Do not skip any stock.",
+    "",
+    "Portfolio stocks:",
+    stockLines || "- No stocks found",
+  ].join("\n");
+}
+
+function clipPromptText(value: string, maxLength: number): string {
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxLength) {
+    return cleaned;
+  }
+
+  return `${cleaned.slice(0, maxLength - 3).trim()}...`;
 }
 
 function stockToAgentInput(stock: StockRowData): MoatAgentStockInput {
@@ -442,6 +502,27 @@ function statusTone(status: MoatAgentResult["status"]): string {
           </label>
 
           <div class="flex items-end">
+            <div class="flex items-center gap-2">
+            <AppTooltip text="Copy a prompt for researching moats for every stock in the active portfolio.">
+              <button
+                type="button"
+                class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-bold text-zinc-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950"
+                :disabled="store.stocks.length === 0"
+                @click="copyPortfolioPrompt"
+              >
+                <Check
+                  v-if="promptCopied"
+                  class="h-4 w-4 text-emerald-600 dark:text-emerald-300"
+                  aria-hidden="true"
+                />
+                <Copy
+                  v-else
+                  class="h-4 w-4"
+                  aria-hidden="true"
+                />
+                {{ promptCopied ? "Copied" : "Prompt" }}
+              </button>
+            </AppTooltip>
             <AppTooltip text="Starts a local research batch. Nothing is saved until you click Add note or Add all.">
               <button
                 type="button"
@@ -462,6 +543,7 @@ function statusTone(status: MoatAgentResult["status"]): string {
                 Research
               </button>
             </AppTooltip>
+            </div>
           </div>
         </div>
 

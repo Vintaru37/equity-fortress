@@ -6,45 +6,63 @@ export function calculateScore(data: StockData): number | null {
     points: number | null;
     missingCredit?: boolean;
   }> = [
-    { weight: 20, points: scoreThreshold(data.roce, [
-      [40, 20],
-      [30, 18],
-      [20, 16],
-      [15, 13],
-      [10, 9],
-      [0, 5],
-    ]) },
-    { weight: 7.5, points: scoreThreshold(data.grossMargin, [
-      [70, 7.5],
-      [60, 6],
-      [45, 3.75],
-      [0, 1.5],
-    ]) },
-    { weight: 7.5, points: scoreThreshold(data.operatingMargin, [
-      [35, 7.5],
-      [25, 6],
-      [15, 3.75],
-      [0, 2.25],
-    ]) },
-    { weight: 10, points: scoreThreshold(data.epsGrowth, [
-      [20, 10],
-      [15, 8],
-      [10, 6],
-      [5, 4],
-      [0, 2],
-    ]) },
-    { weight: 10, points: scoreThreshold(data.fcfMargin, [
-      [25, 10],
-      [20, 8],
-      [10, 5],
-      [0, 3],
-    ]) },
-    { weight: 5, points: scoreThreshold(data.revenueGrowth, [
-      [15, 5],
-      [10, 4],
-      [5, 3],
-      [0, 1],
-    ]) },
+    {
+      weight: 20,
+      points: scoreThreshold(data.roce, [
+        [40, 20],
+        [30, 18],
+        [20, 16],
+        [15, 13],
+        [10, 9],
+        [0, 5],
+      ]),
+    },
+    {
+      weight: 7.5,
+      points: scoreThreshold(data.grossMargin, [
+        [70, 7.5],
+        [60, 6],
+        [45, 3.75],
+        [0, 1.5],
+      ]),
+    },
+    {
+      weight: 7.5,
+      points: scoreThreshold(data.operatingMargin, [
+        [35, 7.5],
+        [25, 6],
+        [15, 3.75],
+        [0, 2.25],
+      ]),
+    },
+    {
+      weight: 10,
+      points: scoreThreshold(data.epsGrowth, [
+        [20, 10],
+        [15, 8],
+        [10, 6],
+        [5, 4],
+        [0, 2],
+      ]),
+    },
+    {
+      weight: 10,
+      points: scoreThreshold(data.fcfMargin, [
+        [25, 10],
+        [20, 8],
+        [10, 5],
+        [0, 3],
+      ]),
+    },
+    {
+      weight: 5,
+      points: scoreThreshold(data.revenueGrowth, [
+        [15, 5],
+        [10, 4],
+        [5, 3],
+        [0, 1],
+      ]),
+    },
     { weight: 15, points: moatScore(data.moat), missingCredit: false },
     { weight: 10, points: valuationScore(data.peg, data.pe) },
     { weight: 10, points: debtScore(data.netDebtToEbitda, data.debtToEquity) },
@@ -142,11 +160,15 @@ function moatScore(moat: Moat): number {
   switch (moat) {
     case "Excellent":
       return 15;
-    case "Good":
+    case "Very Good":
       return 12;
+    case "Good":
+      return 9;
     case "Average":
-      return 8;
+      return 6;
     case "Bad":
+      return 3;
+    case "Very Bad":
       return 0;
     case "Unknown":
       return 3;

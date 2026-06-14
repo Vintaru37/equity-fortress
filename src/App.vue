@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { AlertTriangle, LoaderCircle, Search, Settings } from "@lucide/vue";
+import { AlertTriangle, Eraser, LoaderCircle, Search, Settings } from "@lucide/vue";
 
 import AddTickerForm from "@/components/AddTickerForm.vue";
 import AppTooltip from "@/components/AppTooltip.vue";
@@ -27,6 +27,14 @@ onMounted(() => {
 
 function openColumns(): void {
   stockTableRef.value?.openColumnDialog();
+}
+
+async function clearAllNotes(): Promise<void> {
+  if (!window.confirm("Clear notes for every stock in this portfolio?")) {
+    return;
+  }
+
+  await store.clearAllNotes();
 }
 </script>
 
@@ -87,6 +95,16 @@ function openColumns(): void {
           @click="store.refreshAll"
         />
         <MoatAgentPanel />
+        <AppTooltip text="Clear all notes">
+          <button
+            type="button"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-300"
+            aria-label="Clear all notes"
+            @click="clearAllNotes"
+          >
+            <Eraser class="h-4 w-4" aria-hidden="true" />
+          </button>
+        </AppTooltip>
         <AppTooltip text="Customize columns">
           <button
             type="button"
