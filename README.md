@@ -43,6 +43,32 @@ Build produkcyjny:
 npm run build
 ```
 
+## Deploy na GitHub Pages
+
+Projekt ma workflow `.github/workflows/deploy-pages.yml`, ktory buduje aplikacje
+i publikuje katalog `dist` na GitHub Pages po pushu do `main`.
+
+1. W GitHub repo wejdz w `Settings -> Pages` i ustaw `Source` na
+   `GitHub Actions`.
+2. W `Settings -> Secrets and variables -> Actions` dodaj:
+   - variable `VITE_SUPABASE_URL`
+   - secret `VITE_SUPABASE_ANON_KEY`
+3. W Supabase Auth dodaj URL aplikacji do dozwolonych redirect/site URLs:
+   `https://vintaru37.github.io/equity-fortress/`
+4. Commitnij zmiany i wypchnij je na `main`:
+
+```bash
+git add .github/workflows/deploy-pages.yml vite.config.ts
+git commit -m "Add GitHub Pages deployment"
+git push origin main
+```
+
+Po zakonczeniu workflow aplikacja bedzie pod adresem:
+
+```bash
+https://vintaru37.github.io/equity-fortress/
+```
+
 Testy kalkulacji w Edge Functions:
 
 ```bash
