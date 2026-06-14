@@ -22,11 +22,16 @@ export interface StockData {
   pe: number | null;
   forwardPe: number | null;
   peg: number | null;
+  netDebtToEbitda: number | null;
   revenueGrowth: number | null;
   epsGrowth: number | null;
   debtToEquity: number | null;
   beta: number | null;
+  sector: string | null;
+  industry: string | null;
   moat: Moat;
+  redFlags: string[];
+  scorePenalty: number;
   score: number | null;
   lastUpdated: string | null;
 }
@@ -35,6 +40,8 @@ export interface StockRowData extends StockData {
   notes: string;
   isRefreshing: boolean;
   rowError: string | null;
+  sectorScoreDelta: number | null;
+  sectorPeerCount: number;
 }
 
 export interface PersistedStocksState {

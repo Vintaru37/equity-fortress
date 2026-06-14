@@ -1,81 +1,49 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
-import { AlertTriangle, Search, ShieldCheck } from "@lucide/vue";
+import { computed, onMounted, ref } from "vue";
+import { AlertTriangle, Search, Settings } from "@lucide/vue";
 
 import AddTickerForm from "@/components/AddTickerForm.vue";
+import AppTooltip from "@/components/AppTooltip.vue";
 import RefreshButton from "@/components/RefreshButton.vue";
 import StockTable from "@/components/StockTable.vue";
 import ThemeToggle from "@/components/ThemeToggle.vue";
+import logoUrl from "@/assets/images/logo.png";
 import { useStocksStore } from "@/stores/useStocksStore";
 import { useThemeStore } from "@/stores/useThemeStore";
-import {
-  formatDateTime,
-  formatNumber,
-} from "@/utils/formatters";
+import { formatDateTime } from "@/utils/formatters";
 
 const store = useStocksStore();
 useThemeStore();
 
-const avgScore = computed(() => formatNumber(store.averageScore, 1));
+const stockTableRef = ref<InstanceType<typeof StockTable> | null>(null);
 const lastUpdated = computed(() => formatDateTime(store.lastUpdated));
 
 onMounted(() => {
   void store.loadInitialStocks();
 });
+
+function openColumns(): void {
+  stockTableRef.value?.openColumnDialog();
+}
 </script>
 
 <template>
-  <main class="min-h-screen bg-zinc-100 px-6 py-5 text-zinc-950 transition-colors dark:bg-zinc-950 dark:text-zinc-100">
-    <header class="mb-5 flex items-center justify-between gap-6">
+  <main class="min-h-screen bg-zinc-100 p-3 text-zinc-950 transition-colors dark:bg-zinc-950 dark:text-zinc-100">
+    <header class="mb-4 flex items-center justify-between gap-6">
       <div class="flex items-center gap-3">
-        <div
-          class="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-950 text-white shadow-dashboard ring-1 ring-zinc-800 dark:bg-cyan-500 dark:text-zinc-950 dark:ring-cyan-300"
-        >
-          <ShieldCheck class="h-6 w-6" aria-hidden="true" />
-        </div>
-        <div>
-          <h1 class="text-2xl font-bold text-zinc-950 dark:text-white">
-            Equity Fortress
-          </h1>
-          <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            Investment Dashboard
-          </p>
-        </div>
+        <img
+          :src="logoUrl"
+          alt="Equity Fortress"
+          class="h-14"
+        />
       </div>
 
       <div class="flex items-center gap-3">
-        <div class="rounded-lg border border-zinc-200 bg-white px-4 py-2 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div class="text-xs font-semibold uppercase text-zinc-500 dark:text-zinc-400">
-            Stocks
-          </div>
-          <div class="text-xl font-bold text-zinc-950 dark:text-white">
-            {{ store.stocks.length }}
-          </div>
-        </div>
-
-        <div class="rounded-lg border border-zinc-200 bg-white px-4 py-2 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div class="text-xs font-semibold uppercase text-zinc-500 dark:text-zinc-400">
-            Avg Score
-          </div>
-          <div class="text-xl font-bold text-zinc-950 dark:text-white">
-            {{ avgScore }}
-          </div>
-        </div>
-
-        <div class="rounded-lg border border-zinc-200 bg-white px-4 py-2 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div class="text-xs font-semibold uppercase text-zinc-500 dark:text-zinc-400">
-            1Y Positive
-          </div>
-          <div class="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-            {{ store.positiveOneYearCount }}
-          </div>
-        </div>
-
-        <div class="rounded-lg border border-zinc-200 bg-white px-4 py-2 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div class="text-xs font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+        <div class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400">
             Last Updated
           </div>
-          <div class="text-xl font-bold text-zinc-950 dark:text-white">
+          <div class="text-sm font-bold text-zinc-950 dark:text-white">
             {{ lastUpdated }}
           </div>
         </div>
@@ -85,7 +53,7 @@ onMounted(() => {
     </header>
 
     <section
-      class="mb-4 flex items-start justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      class="mb-4 flex items-start justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
     >
       <div class="flex items-start gap-3">
         <div class="relative">
@@ -107,17 +75,21 @@ onMounted(() => {
 
       <div class="ml-auto flex items-center gap-3">
         <RefreshButton
-          label="Refresh All"
-          title="Fast refresh: updates prices with one batch quote request"
-          :loading="store.refreshingAll"
+          label="Refresh"
+          tooltip="Refresh: updates prices, fundamentals, estimates, consensus and historical prices"
+          :loading="store.refreshing"
           @click="store.refreshAll"
         />
-        <RefreshButton
-          label="Full Sync"
-          title="Deep sync: fetches fundamentals, ratios, estimates and historical prices"
-          :loading="store.fullSyncing"
-          @click="store.fullSyncAll"
-        />
+        <AppTooltip text="Customize columns">
+          <button
+            type="button"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950"
+            aria-label="Customize columns"
+            @click="openColumns"
+          >
+            <Settings class="h-4 w-4" aria-hidden="true" />
+          </button>
+        </AppTooltip>
       </div>
     </section>
 
@@ -137,6 +109,6 @@ onMounted(() => {
       <div class="h-1.5 w-1/2 animate-pulse rounded-full bg-cyan-600" />
     </div>
 
-    <StockTable />
+    <StockTable ref="stockTableRef" />
   </main>
 </template>

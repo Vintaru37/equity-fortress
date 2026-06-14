@@ -1,5 +1,4 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fetchFmpJson } from "./fmp.ts";
 import type {
   CachedStockPayload,
   CacheRow,
@@ -7,10 +6,19 @@ import type {
   Moat,
   StockData,
 } from "./types.ts";
+import {
+  fetchYahooFundamentalsPayload,
+  fetchYahooHistoricalRecords,
+  fetchYahooQuoteRecord,
+  fetchYahooQuoteRecords,
+  fetchYahooSummaryPayload,
+} from "./yahoo.ts";
 
 const QUOTE_CACHE_MS = 6 * 60 * 60 * 1000;
 const FUNDAMENTALS_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const HISTORICAL_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_PROVIDER = "yahoo-finance2";
+const CACHE_SCHEMA_VERSION = 2;
 
 const MOAT_VALUES: Moat[] = ["Excellent", "Good", "Average", "Bad", "Unknown"];
 
@@ -24,9 +32,8 @@ interface StockDataOptions {
   authorizationHeader?: string | null;
 }
 
-interface EndpointResult<T> {
-  key: keyof CachedStockPayload;
-  value?: T;
+interface EndpointResult {
+  patch?: Partial<CachedStockPayload>;
   error?: string;
 }
 
@@ -90,7 +97,10 @@ export async function loadStockData(
   ]);
 
   const now = new Date();
-  const cachedPayload = normalizePayload(cacheRow?.data_json);
+  const rawCachedPayload = normalizePayload(cacheRow?.data_json);
+  const cacheProviderMismatch = cacheRow !== null &&
+    !isCurrentProviderPayload(rawCachedPayload);
+  const cachedPayload = cacheProviderMismatch ? {} : rawCachedPayload;
   const forceRefresh = options.forceRefresh === true;
   const refreshScope = forceRefresh ? "full" : options.refreshScope;
   const hasAnyCache = cacheRow !== null &&
@@ -102,7 +112,12 @@ export async function loadStockData(
     return composeStockData(ticker, cachedPayload, moat, cacheRow);
   }
 
-  if (options.cacheOnly && !hasAnyCache && !refreshScope) {
+  if (
+    options.cacheOnly &&
+    !hasAnyCache &&
+    !refreshScope &&
+    !cacheProviderMismatch
+  ) {
     return emptyStockData(ticker, moat, latestTimestamp(cacheRow));
   }
 
@@ -120,7 +135,7 @@ export async function loadStockData(
     return composeStockData(ticker, cachedPayload, moat, cacheRow);
   }
 
-  const nextPayload: CachedStockPayload = { ...cachedPayload };
+  const nextPayload: CachedStockPayload = forceRefresh ? {} : { ...cachedPayload };
   const timestampPatch: Partial<CacheRow> = {};
   const allErrors: string[] = [];
 
@@ -168,6 +183,7 @@ export async function loadStockData(
   } else {
     delete nextPayload.endpointErrors;
   }
+  stampCachePayload(nextPayload, now);
 
   const updatedRow = await upsertCacheRow(
     supabase,
@@ -178,7 +194,7 @@ export async function loadStockData(
   );
 
   if (Object.keys(timestampPatch).length > 0 && allErrors.length === 0) {
-    await logRefresh(supabase, ticker, "success", "FMP cache refreshed");
+    await logRefresh(supabase, ticker, "success", "Yahoo cache refreshed");
   }
 
   return composeStockData(ticker, nextPayload, moat, updatedRow ?? cacheRow);
@@ -304,7 +320,12 @@ export function emptyStockData(
     epsGrowth: null,
     debtToEquity: null,
     beta: null,
+    sector: null,
+    industry: null,
+    netDebtToEbitda: null,
     moat,
+    redFlags: [],
+    scorePenalty: 0,
     score: null,
     lastUpdated,
   };
@@ -462,18 +483,21 @@ async function upsertCacheRow(
 }
 
 async function fetchQuoteGroup(ticker: string): Promise<GroupResult> {
-  const [profile, quote] = await Promise.all([
-    safeEndpoint("profile", "profile", {
-      endpoint: "/stable/profile",
-      params: { symbol: ticker },
-    }, firstRecord),
-    safeEndpoint("quote", "quote", {
-      endpoint: "/stable/quote",
-      params: { symbol: ticker },
-    }, firstRecord),
-  ]);
+  const quote = await safePatch("quote", async () => {
+    const record = await fetchYahooQuoteRecord(ticker);
+    return {
+      quote: record,
+      profile: compactPayloadRecord({
+        companyName: firstString(record, ["companyName", "name", "longName", "shortName"]),
+        company: firstString(record, ["companyName", "name", "longName", "shortName"]),
+        name: firstString(record, ["companyName", "name", "longName", "shortName"]),
+        price: firstNumber(record, ["price", "currentPrice", "regularMarketPrice"]),
+        beta: firstNumber(record, ["beta"]),
+      }),
+    };
+  });
 
-  return groupResult([profile, quote]);
+  return groupResult([quote]);
 }
 
 async function fetchSingleQuoteRefreshGroup(ticker: string): Promise<GroupResult> {
@@ -490,100 +514,50 @@ async function fetchSingleQuoteRefreshGroup(ticker: string): Promise<GroupResult
 }
 
 async function fetchBatchQuoteGroup(tickers: string[]): Promise<GroupResult> {
-  const quotes = await safeEndpoint("quotes", "batch-quote", {
-    endpoint: "/stable/batch-quote",
-    params: { symbols: tickers.join(",") },
-  }, recordArray);
+  const quotes = await safePatch("batch-quote", async () => ({
+    quotes: await fetchYahooQuoteRecords(tickers),
+  }));
 
   return groupResult([quotes]);
 }
 
 async function fetchFundamentalsGroup(ticker: string): Promise<GroupResult> {
-  const [
-    incomeStatements,
-    incomeStatementGrowth,
-    balanceSheets,
-    cashFlows,
-    ratiosTtm,
-    keyMetricsTtm,
-    estimates,
-    gradesConsensus,
-  ] = await Promise.all([
-    safeEndpoint("incomeStatements", "income-statement", {
-      endpoint: "/stable/income-statement",
-      params: { symbol: ticker, period: "annual", limit: 6 },
-    }, recordArray),
-    safeEndpoint("incomeStatementGrowth", "income-statement-growth", {
-      endpoint: "/stable/income-statement-growth",
-      params: { symbol: ticker, period: "annual", limit: 5 },
-    }, recordArray),
-    safeEndpoint("balanceSheets", "balance-sheet-statement", {
-      endpoint: "/stable/balance-sheet-statement",
-      params: { symbol: ticker, period: "annual", limit: 2 },
-    }, recordArray),
-    safeEndpoint("cashFlows", "cash-flow-statement", {
-      endpoint: "/stable/cash-flow-statement",
-      params: { symbol: ticker, period: "annual", limit: 3 },
-    }, recordArray),
-    safeEndpoint("ratiosTtm", "ratios-ttm", {
-      endpoint: "/stable/ratios-ttm",
-      params: { symbol: ticker },
-    }, firstRecord),
-    safeEndpoint("keyMetricsTtm", "key-metrics-ttm", {
-      endpoint: "/stable/key-metrics-ttm",
-      params: { symbol: ticker },
-    }, firstRecord),
-    safeEndpoint("estimates", "analyst-estimates", {
-      endpoint: "/stable/analyst-estimates",
-      params: { symbol: ticker, period: "annual", page: 0, limit: 10 },
-    }, recordArray),
-    safeEndpoint("gradesConsensus", "grades-consensus", {
-      endpoint: "/stable/grades-consensus",
-      params: { symbol: ticker },
-    }, firstRecord),
+  const from = toIsoDate(addDays(new Date(), -(7 * 365 + 21)));
+  const [series, summary] = await Promise.all([
+    safePatch("fundamentals-time-series", () =>
+      fetchYahooFundamentalsPayload(ticker, from)
+    ),
+    safePatch("quote-summary", () => fetchYahooSummaryPayload(ticker)),
   ]);
 
-  return groupResult([
-    incomeStatements,
-    incomeStatementGrowth,
-    balanceSheets,
-    cashFlows,
-    ratiosTtm,
-    keyMetricsTtm,
-    estimates,
-    gradesConsensus,
-  ]);
+  return groupResult([series, summary]);
 }
 
 async function fetchHistoricalGroup(ticker: string): Promise<GroupResult> {
   const today = toIsoDate(new Date());
   const from = toIsoDate(addDays(new Date(), -(5 * 365 + 21)));
 
-  const historical = await safeEndpoint("historical", "historical-price-eod/full", {
-    endpoint: "/stable/historical-price-eod/full",
-    params: { symbol: ticker, from, to: today },
-  }, historicalArray);
+  const historical = await safePatch("historical", async () => ({
+    historical: await fetchYahooHistoricalRecords(ticker, from, today),
+  }));
 
   return groupResult([historical]);
 }
 
-async function safeEndpoint<T>(
-  key: keyof CachedStockPayload,
+async function safePatch(
   label: string,
-  request: { endpoint: string; params?: Record<string, string | number | boolean> },
-  transform: (input: unknown) => T,
-): Promise<EndpointResult<T>> {
+  load: () => Promise<Partial<CachedStockPayload>>,
+): Promise<EndpointResult> {
   try {
-    const value = transform(await fetchFmpJson(request));
-    return { key, value };
+    return { patch: await load() };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`FMP endpoint failed: ${label}`, { message });
-    return { key, error: `${label}: ${message}` };
+    console.error(`Yahoo endpoint failed: ${label}`, { message });
+    return { error: `${label}: ${message}` };
   }
 }
 
-function groupResult(results: Array<EndpointResult<unknown>>): GroupResult {
+function groupResult(results: EndpointResult[]): GroupResult {
   const patch: Partial<CachedStockPayload> = {};
   const errors: string[] = [];
   let hasSuccess = false;
@@ -594,8 +568,10 @@ function groupResult(results: Array<EndpointResult<unknown>>): GroupResult {
       continue;
     }
 
-    (patch as Record<string, unknown>)[result.key] = result.value;
-    hasSuccess = true;
+    if (result.patch && Object.keys(result.patch).length > 0) {
+      Object.assign(patch, result.patch);
+      hasSuccess = true;
+    }
   }
 
   return { patch, errors, hasSuccess };
@@ -609,7 +585,32 @@ function normalizePayload(payload: CachedStockPayload | null | undefined): Cache
   return payload;
 }
 
-function composeStockData(
+function isCurrentProviderPayload(payload: CachedStockPayload): boolean {
+  return payload._meta?.provider === CACHE_PROVIDER &&
+    payload._meta?.schemaVersion === CACHE_SCHEMA_VERSION;
+}
+
+function stampCachePayload(payload: CachedStockPayload, now: Date): void {
+  payload._meta = {
+    provider: CACHE_PROVIDER,
+    refreshedAt: now.toISOString(),
+    schemaVersion: CACHE_SCHEMA_VERSION,
+  };
+}
+
+function compactPayloadRecord(record: Record<string, unknown>): JsonRecord {
+  const compact: JsonRecord = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    if (value !== null && value !== undefined && value !== "") {
+      compact[key] = value;
+    }
+  }
+
+  return compact;
+}
+
+export function composeStockData(
   ticker: string,
   payload: CachedStockPayload,
   moat: Moat,
@@ -678,6 +679,14 @@ function composeStockData(
     "stockholdersEquity",
     "totalEquity",
   ]);
+  const cashAndEquivalents = firstNumber(latestBalance, [
+    "cashAndCashEquivalents",
+    "cashAndShortTermInvestments",
+    "cashAndCashEquivalentsAndShortTermInvestments",
+  ]);
+  const netDebt = firstNumber(latestBalance, ["netDebt"]) ??
+    firstNumber(keyMetricsTtm, ["netDebt"]) ??
+    subtractNullable(totalDebt, cashAndEquivalents);
   const freeCashFlow = firstNumber(cashFlowTtm, ["freeCashFlow"]) ??
     firstNumber(latestCashFlow, ["freeCashFlow"]) ??
     freeCashFlowFromCfoAndCapex(
@@ -687,8 +696,10 @@ function composeStockData(
         firstNumber(latestCashFlow, ["capitalExpenditure", "capitalExpenditures"]),
     );
   const epsTtm = firstNumber(incomeTtm, ["eps", "epsDiluted", "epsdiluted"]) ??
-    firstNumber(keyMetricsTtm, ["netIncomePerShareTTM", "epsTTM"]) ??
-    firstNumber(quote, ["eps"]);
+    firstNumber(keyMetricsTtm, ["netIncomePerShareTTM", "epsTTM", "trailingEps"]) ??
+    firstNumber(quote, ["eps", "epsTrailingTwelveMonths", "trailingEps"]);
+  const ebitdaTtm = firstNumber(incomeTtm, ["ebitda", "EBITDA"]) ??
+    firstNumber(keyMetricsTtm, ["ebitdaTTM", "ebitda"]);
   const latestEps = epsFromIncome(latestIncome);
   const previousEps = epsFromIncome(previousIncome);
 
@@ -721,10 +732,16 @@ function composeStockData(
     "priceEarningsRatioTTM",
     "peRatioTTM",
     "priceToEarningsRatioTTM",
-  ])) ?? positiveNumber(firstNumber(quote, ["pe", "peRatio"]));
+  ])) ?? positiveNumber(firstNumber(quote, ["pe", "peRatio", "trailingPE"]));
   const pe = reportedPe ?? priceEarningsRatio(currentPrice, epsTtm);
-  const forwardEps = estimatedNextYearEps(payload.estimates ?? []);
-  const forwardPe = priceEarningsRatio(currentPrice, forwardEps);
+  const forwardEps = estimatedNextYearEps(payload.estimates ?? []) ??
+    firstNumber(keyMetricsTtm, ["forwardEps"]) ??
+    firstNumber(quote, ["epsForward"]);
+  const reportedForwardPe = positiveNumber(firstNumber(keyMetricsTtm, [
+    "forwardPE",
+    "forwardPe",
+  ])) ?? positiveNumber(firstNumber(quote, ["forwardPE", "forwardPe"]));
+  const forwardPe = priceEarningsRatio(currentPrice, forwardEps) ?? reportedForwardPe;
   const revenueGrowth = growthPercent(
     firstNumber(latestIncome, ["revenue"]),
     firstNumber(previousIncome, ["revenue"]),
@@ -757,9 +774,15 @@ function composeStockData(
       "debtToEquityRatioTTM",
       "debtToEquity",
     ]));
+  const netDebtToEbitda = dividePositiveDenominator(netDebt, ebitdaTtm);
 
   const historical = normalizeHistoricalPoints(payload.historical ?? []);
   const performance = calculatePerformance(historical);
+  const redFlags = calculateRedFlags({
+    debtToEquity,
+    netDebtToEbitda,
+    cashFlows: payload.cashFlows ?? [],
+  });
 
   const stockData: StockData = {
     ticker,
@@ -779,11 +802,16 @@ function composeStockData(
     pe: roundNumber(pe),
     forwardPe: roundNumber(forwardPe),
     peg: roundNumber(peg),
+    netDebtToEbitda: roundNumber(netDebtToEbitda),
     revenueGrowth: roundNumber(revenueGrowth),
     epsGrowth: roundNumber(epsGrowth),
     debtToEquity: roundNumber(debtToEquity),
     beta: roundNumber(firstNumber(profile, ["beta"]) ?? firstNumber(quote, ["beta"])),
+    sector: firstString(profile, ["sector"]),
+    industry: firstString(profile, ["industry"]),
     moat,
+    redFlags: redFlags.messages,
+    scorePenalty: redFlags.penalty,
     score: null,
     lastUpdated: latestTimestamp(cacheRow),
   };
@@ -792,33 +820,44 @@ function composeStockData(
   return stockData;
 }
 
-function calculateScore(data: StockData): number | null {
-  const factors: Array<{ weight: number; points: number | null }> = [
-    { weight: 35, points: scoreThreshold(data.roce, [
-      [40, 35],
-      [30, 32],
-      [20, 28],
-      [15, 22],
-      [10, 15],
-      [0, 8],
+export function calculateScore(data: StockData): number | null {
+  const factors: Array<{
+    weight: number;
+    points: number | null;
+    missingCredit?: boolean;
+  }> = [
+    { weight: 20, points: scoreThreshold(data.roce, [
+      [40, 20],
+      [30, 18],
+      [20, 16],
+      [15, 13],
+      [10, 9],
+      [0, 5],
     ]) },
-    { weight: 15, points: scoreThreshold(data.operatingMargin, [
-      [35, 15],
-      [25, 12],
+    { weight: 7.5, points: scoreThreshold(data.grossMargin, [
+      [70, 7.5],
+      [60, 6],
+      [45, 3.75],
+      [0, 1.5],
+    ]) },
+    { weight: 7.5, points: scoreThreshold(data.operatingMargin, [
+      [35, 7.5],
+      [25, 6],
+      [15, 3.75],
+      [0, 2.25],
+    ]) },
+    { weight: 10, points: scoreThreshold(data.epsGrowth, [
+      [20, 10],
       [15, 8],
-      [0, 4],
-    ]) },
-    { weight: 15, points: scoreThreshold(data.fcfMargin, [
-      [25, 15],
-      [20, 12],
-      [10, 8],
-      [0, 4],
-    ]) },
-    { weight: 10, points: scoreThreshold(data.grossMargin, [
-      [70, 10],
-      [60, 8],
-      [45, 5],
+      [10, 6],
+      [5, 4],
       [0, 2],
+    ]) },
+    { weight: 10, points: scoreThreshold(data.fcfMargin, [
+      [25, 10],
+      [20, 8],
+      [10, 5],
+      [0, 3],
     ]) },
     { weight: 5, points: scoreThreshold(data.revenueGrowth, [
       [15, 5],
@@ -826,23 +865,22 @@ function calculateScore(data: StockData): number | null {
       [5, 3],
       [0, 1],
     ]) },
-    { weight: 5, points: scoreThreshold(data.epsGrowth, [
-      [15, 5],
-      [10, 4],
-      [5, 3],
-      [0, 1],
-    ]) },
+    { weight: 15, points: moatScore(data.moat), missingCredit: false },
     { weight: 10, points: valuationScore(data.peg, data.pe) },
-    { weight: 5, points: debtScore(data.debtToEquity) },
+    { weight: 10, points: debtScore(data.netDebtToEbitda, data.debtToEquity) },
+    { weight: 5, points: analystScore(data.analystConsensus) },
   ];
 
-  if (factors.every((factor) => factor.points === null)) {
+  const scoredFactors = factors.filter((factor) => factor.points !== null);
+  if (scoredFactors.length === 0) {
     return null;
   }
 
-  const score = factors.reduce((sum, factor) => {
-    return sum + (factor.points ?? factor.weight * 0.45);
+  const rawScore = factors.reduce((sum, factor) => {
+    const fallback = factor.missingCredit === false ? 0 : factor.weight * 0.3;
+    return sum + (factor.points ?? fallback);
   }, 0);
+  const score = rawScore - (data.scorePenalty ?? 0);
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -851,7 +889,7 @@ function scoreThreshold(
   value: number | null,
   thresholds: Array<[minimum: number, points: number]>,
 ): number | null {
-  if (value === null) {
+  if (value == null) {
     return null;
   }
 
@@ -865,7 +903,7 @@ function scoreThreshold(
 }
 
 function valuationScore(peg: number | null, pe: number | null): number | null {
-  if (peg !== null) {
+  if (peg != null) {
     if (peg < 1) return 10;
     if (peg < 1.5) return 8;
     if (peg < 2) return 5;
@@ -873,7 +911,7 @@ function valuationScore(peg: number | null, pe: number | null): number | null {
     return 0;
   }
 
-  if (pe !== null) {
+  if (pe != null) {
     if (pe <= 20) return 7;
     if (pe <= 30) return 5;
     if (pe <= 40) return 3;
@@ -883,16 +921,92 @@ function valuationScore(peg: number | null, pe: number | null): number | null {
   return null;
 }
 
-function debtScore(debtToEquity: number | null): number | null {
-  if (debtToEquity === null) {
+function debtScore(
+  netDebtToEbitda: number | null,
+  debtToEquity: number | null,
+): number | null {
+  if (netDebtToEbitda != null) {
+    if (netDebtToEbitda < 0) return 10;
+    if (netDebtToEbitda <= 1) return 9;
+    if (netDebtToEbitda <= 2) return 7;
+    if (netDebtToEbitda <= 3) return 5;
+    if (netDebtToEbitda <= 4) return 2;
+    return 0;
+  }
+
+  if (debtToEquity == null) {
     return null;
   }
 
-  if (debtToEquity < 0.3) return 5;
-  if (debtToEquity < 0.5) return 4;
-  if (debtToEquity < 1) return 3;
-  if (debtToEquity < 1.5) return 1;
+  if (debtToEquity < 0.3) return 10;
+  if (debtToEquity < 0.5) return 8;
+  if (debtToEquity < 1) return 6;
+  if (debtToEquity < 1.5) return 3;
   return 0;
+}
+
+function analystScore(consensus: string | null): number | null {
+  if (!consensus) {
+    return null;
+  }
+
+  const normalized = consensus.toLowerCase();
+  if (normalized.includes("strong buy")) return 5;
+  if (normalized.includes("buy") && !normalized.includes("sell")) return 4;
+  if (normalized.includes("hold") || normalized.includes("neutral")) return 2.5;
+  if (normalized.includes("strong sell")) return 0;
+  if (normalized.includes("sell")) return 1;
+  return null;
+}
+
+function moatScore(moat: Moat): number {
+  switch (moat) {
+    case "Excellent":
+      return 15;
+    case "Good":
+      return 12;
+    case "Average":
+      return 8;
+    case "Bad":
+      return 0;
+    case "Unknown":
+      return 3;
+  }
+}
+
+function calculateRedFlags(input: {
+  debtToEquity: number | null;
+  netDebtToEbitda: number | null;
+  cashFlows: JsonRecord[];
+}): { messages: string[]; penalty: number } {
+  const messages: string[] = [];
+  let penalty = 0;
+
+  if (
+    input.debtToEquity !== null &&
+    input.debtToEquity > 2 &&
+    input.netDebtToEbitda !== null &&
+    input.netDebtToEbitda > 3
+  ) {
+    messages.push("Debt/Equity > 2 and Net Debt/EBITDA > 3");
+    penalty += 10;
+  }
+
+  if (hasTwoLatestNegativeFreeCashFlow(input.cashFlows)) {
+    messages.push("FCF negative for 2 latest years");
+    penalty += 10;
+  }
+
+  return { messages, penalty: Math.min(20, penalty) };
+}
+
+function hasTwoLatestNegativeFreeCashFlow(cashFlows: JsonRecord[]): boolean {
+  const latestTwo = cashFlows
+    .map((record) => firstNumber(record, ["freeCashFlow"]))
+    .filter((value): value is number => value !== null)
+    .slice(0, 2);
+
+  return latestTwo.length >= 2 && latestTwo.every((value) => value < 0);
 }
 
 function analystConsensus(record: JsonRecord | null): string | null {
@@ -1021,46 +1135,6 @@ function normalizeHistoricalPoints(
     })
     .filter((point): point is { date: string; close: number } => point !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function recordArray(input: unknown): JsonRecord[] {
-  if (Array.isArray(input)) {
-    return input.filter(isRecord);
-  }
-
-  if (isRecord(input) && Array.isArray(input.data)) {
-    return input.data.filter(isRecord);
-  }
-
-  return [];
-}
-
-function historicalArray(input: unknown): JsonRecord[] {
-  if (Array.isArray(input)) {
-    return input.filter(isRecord);
-  }
-
-  if (isRecord(input) && Array.isArray(input.historical)) {
-    return input.historical.filter(isRecord);
-  }
-
-  if (isRecord(input) && Array.isArray(input.data)) {
-    return input.data.filter(isRecord);
-  }
-
-  return [];
-}
-
-function firstRecord(input: unknown): JsonRecord | null {
-  if (Array.isArray(input)) {
-    return input.find(isRecord) ?? null;
-  }
-
-  if (isRecord(input) && Array.isArray(input.data)) {
-    return input.data.find(isRecord) ?? null;
-  }
-
-  return isRecord(input) ? input : null;
 }
 
 function first(records: JsonRecord[] | null | undefined): JsonRecord | null {

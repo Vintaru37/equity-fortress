@@ -30,6 +30,7 @@ function onChange(event: Event): void {
     <option
       v-for="option in MOAT_OPTIONS"
       :key="option"
+      class="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
       :value="option"
     >
       {{ option }}

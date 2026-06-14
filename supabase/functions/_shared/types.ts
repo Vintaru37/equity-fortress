@@ -17,11 +17,16 @@ export interface StockData {
   pe: number | null;
   forwardPe: number | null;
   peg: number | null;
+  netDebtToEbitda: number | null;
   revenueGrowth: number | null;
   epsGrowth: number | null;
   debtToEquity: number | null;
   beta: number | null;
+  sector: string | null;
+  industry: string | null;
   moat: Moat;
+  redFlags: string[];
+  scorePenalty: number;
   score: number | null;
   lastUpdated: string | null;
 }
@@ -29,6 +34,11 @@ export interface StockData {
 export type JsonRecord = Record<string, unknown>;
 
 export interface CachedStockPayload {
+  _meta?: {
+    provider?: string;
+    refreshedAt?: string;
+    schemaVersion?: number;
+  };
   profile?: JsonRecord | null;
   quote?: JsonRecord | null;
   quotes?: JsonRecord[] | null;

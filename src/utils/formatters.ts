@@ -63,6 +63,25 @@ export function moatTone(moat: Moat): string {
   }
 }
 
+export function analystTone(value: string | null): string {
+  if (!value) {
+    return "text-zinc-500 dark:text-zinc-500";
+  }
+
+  const normalized = value.toLowerCase();
+  if (normalized.includes("buy") && !normalized.includes("sell")) {
+    return "text-emerald-700 dark:text-emerald-400/85";
+  }
+  if (normalized.includes("sell")) {
+    return "text-rose-700 dark:text-rose-300";
+  }
+  if (normalized.includes("hold") || normalized.includes("neutral")) {
+    return "text-amber-700 dark:text-amber-300";
+  }
+
+  return "text-zinc-700 dark:text-zinc-200";
+}
+
 export function latestTimestamp(values: Array<string | null>): string | null {
   const timestamps = values
     .filter((value): value is string => Boolean(value))

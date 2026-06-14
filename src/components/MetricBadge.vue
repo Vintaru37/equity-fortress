@@ -7,7 +7,18 @@ import {
   formatScore,
 } from "@/utils/formatters";
 
-type MetricKind = "neutral" | "performance" | "roce" | "peg" | "debt" | "score";
+type MetricKind =
+  | "neutral"
+  | "performance"
+  | "grossMargin"
+  | "operatingMargin"
+  | "fcfMargin"
+  | "roce"
+  | "pe"
+  | "peg"
+  | "debt"
+  | "beta"
+  | "score";
 
 const tones = {
   neutral: "border-zinc-200 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200",
@@ -47,22 +58,57 @@ const tone = computed(() => {
   if (props.kind === "performance") {
     if (value > 0) return tones.positive;
     if (value < 0) return tones.negative;
+    return tones.warning;
+  }
+
+  if (props.kind === "grossMargin") {
+    if (value >= 60) return tones.positive;
+    if (value >= 45) return tones.warning;
+    return tones.negative;
+  }
+
+  if (props.kind === "operatingMargin") {
+    if (value >= 25) return tones.positive;
+    if (value >= 15) return tones.warning;
+    return tones.negative;
   }
 
   if (props.kind === "roce") {
-    if (value > 20) return tones.positive;
+    if (value >= 20) return tones.positive;
     if (value >= 10) return tones.warning;
     return tones.negative;
   }
 
+  if (props.kind === "fcfMargin") {
+    if (value >= 20) return tones.positive;
+    if (value >= 10) return tones.warning;
+    return tones.negative;
+  }
+
+  if (props.kind === "pe") {
+    if (value <= 0) return tones.negative;
+    if (value <= 20) return tones.positive;
+    if (value <= 40) return tones.warning;
+    return tones.negative;
+  }
+
   if (props.kind === "peg") {
+    if (value <= 0) return tones.negative;
     if (value < 1.5) return tones.positive;
-    if (value > 2) return tones.negative;
+    if (value <= 2) return tones.warning;
+    return tones.negative;
   }
 
   if (props.kind === "debt") {
     if (value < 0.5) return tones.positive;
-    if (value > 1.5) return tones.negative;
+    if (value <= 1.5) return tones.warning;
+    return tones.negative;
+  }
+
+  if (props.kind === "beta") {
+    if (value <= 1) return tones.positive;
+    if (value <= 1.3) return tones.warning;
+    return tones.negative;
   }
 
   if (props.kind === "score") {

@@ -5,6 +5,7 @@ import {
   latestTimestamp,
   normalizeTickerInput,
 } from "@/utils/formatters";
+import { calculateScore } from "@/utils/score";
 import { MOAT_OPTIONS } from "@/types/stock";
 import type {
   Moat,
@@ -149,37 +150,19 @@ function emptyStock(ticker: string, moat: Moat = "Unknown"): StockData {
     pe: null,
     forwardPe: null,
     peg: null,
+    netDebtToEbitda: null,
     revenueGrowth: null,
     epsGrowth: null,
     debtToEquity: null,
     beta: null,
+    sector: null,
+    industry: null,
     moat,
+    redFlags: [],
+    scorePenalty: 0,
     score: null,
     lastUpdated: null,
   };
-}
-
-function needsFullRefresh(stock: StockRowData | null): boolean {
-  if (!stock) {
-    return true;
-  }
-
-  const hasHistory = stock.oneYearChart.length > 1 ||
-    stock.performance1Y !== null ||
-    stock.performance3Y !== null ||
-    stock.performance5Y !== null;
-  const hasFundamentals = [
-    stock.grossMargin,
-    stock.operatingMargin,
-    stock.roce,
-    stock.fcfMargin,
-    stock.pe,
-    stock.forwardPe,
-    stock.debtToEquity,
-    stock.score,
-  ].some((value) => value !== null);
-
-  return stock.currentPrice === null || !hasHistory || !hasFundamentals;
 }
 
 export const useStocksStore = defineStore("stocks", () => {
@@ -191,12 +174,13 @@ export const useStocksStore = defineStore("stocks", () => {
       notes: persisted.notes[ticker] ?? "",
       isRefreshing: false,
       rowError: null,
+      sectorScoreDelta: null,
+      sectorPeerCount: 0,
     })),
   );
   const filter = ref("");
   const loading = ref(false);
-  const refreshingAll = ref(false);
-  const fullSyncing = ref(false);
+  const refreshing = ref(false);
   const initialized = ref(false);
   const error = ref<string | null>(null);
   const lastUpdated = ref<string | null>(
@@ -248,12 +232,22 @@ export const useStocksStore = defineStore("stocks", () => {
   function mergeStock(stock: StockData, rowError: string | null = null): void {
     const index = stocks.value.findIndex((item) => item.ticker === stock.ticker);
     const existing = index >= 0 ? stocks.value[index] : null;
-    const next: StockRowData = {
+    const moat = persisted.moats[stock.ticker] ?? existing?.moat ?? stock.moat;
+    const scoreInput: StockData = {
       ...stock,
-      moat: persisted.moats[stock.ticker] ?? existing?.moat ?? stock.moat,
+      moat,
+      redFlags: stock.redFlags ?? [],
+      scorePenalty: stock.scorePenalty ?? 0,
+    };
+    const next: StockRowData = {
+      ...scoreInput,
+      moat,
+      score: calculateScore(scoreInput),
       notes: existing?.notes ?? persisted.notes[stock.ticker] ?? "",
       isRefreshing: false,
       rowError,
+      sectorScoreDelta: existing?.sectorScoreDelta ?? null,
+      sectorPeerCount: existing?.sectorPeerCount ?? 0,
     };
 
     if (index >= 0) {
@@ -263,10 +257,50 @@ export const useStocksStore = defineStore("stocks", () => {
     } else {
       stocks.value = [...stocks.value, next];
     }
+    recomputeSectorComparisons();
   }
 
   function updateLastUpdated(): void {
     lastUpdated.value = latestTimestamp(stocks.value.map((stock) => stock.lastUpdated));
+  }
+
+  function recomputeSectorComparisons(): void {
+    const groups = new Map<string, StockRowData[]>();
+
+    for (const stock of stocks.value) {
+      const sector = stock.sector?.trim();
+      if (!sector || stock.score === null) {
+        continue;
+      }
+
+      const sectorKey = sector.toLowerCase();
+      groups.set(sectorKey, [...(groups.get(sectorKey) ?? []), stock]);
+    }
+
+    const sectorStats = new Map<string, { average: number; count: number }>();
+    for (const [sectorKey, group] of groups) {
+      if (group.length < 2) {
+        continue;
+      }
+
+      const average = group.reduce((sum, stock) => sum + (stock.score ?? 0), 0) /
+        group.length;
+      sectorStats.set(sectorKey, { average, count: group.length });
+    }
+
+    stocks.value = stocks.value.map((stock) => {
+      const sectorKey = stock.sector?.trim().toLowerCase();
+      const stats = sectorKey ? sectorStats.get(sectorKey) : undefined;
+      if (!stats || stock.score === null) {
+        return { ...stock, sectorScoreDelta: null, sectorPeerCount: 0 };
+      }
+
+      return {
+        ...stock,
+        sectorScoreDelta: Math.round((stock.score - stats.average) * 10) / 10,
+        sectorPeerCount: stats.count,
+      };
+    });
   }
 
   async function loadInitialStocks(): Promise<void> {
@@ -281,7 +315,7 @@ export const useStocksStore = defineStore("stocks", () => {
       const tickers = stocks.value.map((stock) => stock.ticker);
       const data = await callEdgeFunction<StockData[]>("get-stocks-batch", {
         tickers,
-        refreshScope: null,
+        refreshScope: "full",
       });
 
       data.forEach((stock) => mergeStock(stock));
@@ -308,11 +342,8 @@ export const useStocksStore = defineStore("stocks", () => {
     }
 
     const index = stocks.value.findIndex((stock) => stock.ticker === normalizedTicker);
-    const existingStock = index >= 0 ? stocks.value[index] : null;
     const resolvedRefreshScope: RefreshScope = refreshScope === "auto"
-      ? needsFullRefresh(existingStock)
-        ? "full"
-        : "quote"
+      ? "full"
       : refreshScope;
 
     if (index >= 0) {
@@ -353,38 +384,7 @@ export const useStocksStore = defineStore("stocks", () => {
   }
 
   async function refreshAll(): Promise<void> {
-    refreshingAll.value = true;
-    error.value = null;
-    stocks.value = stocks.value.map((stock) => ({
-      ...stock,
-      isRefreshing: true,
-      rowError: null,
-    }));
-
-    try {
-      const data = await callEdgeFunction<StockData[]>("get-stocks-batch", {
-        tickers: stocks.value.map((stock) => stock.ticker),
-        refreshScope: "quote",
-      });
-
-      data.forEach((stock) => mergeStock(stock));
-      persistState();
-    } catch (requestError) {
-      error.value = requestError instanceof Error
-        ? requestError.message
-        : "Failed to refresh stocks";
-      stocks.value = stocks.value.map((stock) => ({
-        ...stock,
-        isRefreshing: false,
-      }));
-    }
-
-    refreshingAll.value = false;
-    updateLastUpdated();
-  }
-
-  async function fullSyncAll(): Promise<void> {
-    fullSyncing.value = true;
+    refreshing.value = true;
     error.value = null;
     stocks.value = stocks.value.map((stock) => ({
       ...stock,
@@ -403,14 +403,14 @@ export const useStocksStore = defineStore("stocks", () => {
     } catch (requestError) {
       error.value = requestError instanceof Error
         ? requestError.message
-        : "Failed to sync stocks";
+        : "Failed to refresh stocks";
       stocks.value = stocks.value.map((stock) => ({
         ...stock,
         isRefreshing: false,
       }));
     }
 
-    fullSyncing.value = false;
+    refreshing.value = false;
     updateLastUpdated();
   }
 
@@ -434,6 +434,7 @@ export const useStocksStore = defineStore("stocks", () => {
 
   function removeTicker(ticker: string): void {
     stocks.value = stocks.value.filter((stock) => stock.ticker !== ticker);
+    recomputeSectorComparisons();
     persistState();
     updateLastUpdated();
   }
@@ -444,9 +445,15 @@ export const useStocksStore = defineStore("stocks", () => {
       return;
     }
 
-    stocks.value = stocks.value.map((item) =>
-      item.ticker === ticker ? { ...item, moat } : item
-    );
+    stocks.value = stocks.value.map((item) => {
+      if (item.ticker !== ticker) {
+        return item;
+      }
+
+      const next = { ...item, moat };
+      return { ...next, score: calculateScore(next) };
+    });
+    recomputeSectorComparisons();
     persisted.moats[ticker] = moat;
     persistState();
   }
@@ -469,8 +476,7 @@ export const useStocksStore = defineStore("stocks", () => {
     filteredStocks,
     filter,
     loading,
-    refreshingAll,
-    fullSyncing,
+    refreshing,
     initialized,
     error,
     lastUpdated,
@@ -479,7 +485,6 @@ export const useStocksStore = defineStore("stocks", () => {
     loadInitialStocks,
     refreshStock,
     refreshAll,
-    fullSyncAll,
     addTicker,
     removeTicker,
     updateMoat,

@@ -2,7 +2,7 @@
 
 Equity Fortress to dashboard inwestycyjny z frontem w Vue 3 oraz backendem na
 Supabase Edge Functions. Frontend komunikuje sie wylacznie z Edge Functions.
-Financial Modeling Prep API nie jest wolane bezposrednio z przegladarki.
+Dane rynkowe sa pobierane po stronie backendu przez `yahoo-finance2`.
 
 ## Stack
 
@@ -16,7 +16,7 @@ Financial Modeling Prep API nie jest wolane bezposrednio z przegladarki.
 - Supabase
 - Supabase Edge Functions
 - Postgres
-- Financial Modeling Prep API
+- yahoo-finance2 / Yahoo Finance
 
 ## Uruchomienie frontendu
 
@@ -43,6 +43,15 @@ Build produkcyjny:
 npm run build
 ```
 
+Testy kalkulacji w Edge Functions:
+
+```bash
+npm run test:edge
+```
+
+Ten skrypt wymaga lokalnie zainstalowanego Deno, czyli runtime TypeScript/JavaScript
+uzywanego przez Supabase Edge Functions.
+
 ## Zmienne frontendowe
 
 Utworz `.env` na podstawie `.env.example`:
@@ -57,7 +66,7 @@ Frontend uzywa tych wartosci do wywolywania:
 - `/functions/v1/get-stock`
 - `/functions/v1/get-stocks-batch`
 
-Nie ma klienta FMP po stronie UI.
+Nie ma klienta danych rynkowych po stronie UI.
 
 ## Funkcje UI
 
@@ -77,18 +86,25 @@ Nie ma klienta FMP po stronie UI.
 - edycja `MOAT`: `Excellent`, `Good`, `Average`, `Bad`, `Unknown`
 - notatki per spolka
 - dark/light theme
-- budget-friendly refresh: `Refresh All` odswieza quote'y jednym batch requestem
+- `Refresh` wykonuje pelne odswiezenie cen, fundamentow, estimates, consensus
+  oraz historical prices
 
 `MOAT` i `Notes` sa zapisywane lokalnie w `localStorage`. Dane rynkowe sa
 pobierane tylko przez Supabase Edge Functions.
 
-### Refresh All vs Full Sync
+### Refresh
 
-- `Refresh All` jest tanie: odswieza tylko aktualne quote'y przez batch request.
-- `Full Sync` jest drogie: pobiera quote/profile, fundamenty, ratios, estimates
-  oraz historical prices dla wszystkich widocznych tickerow.
-- Refresh pojedynczego wiersza jest automatyczny: jesli wiersz ma prawie same
-  `N/A`, zrobi full fetch; jesli dane juz sa kompletne, odswiezy tylko quote.
+`Refresh` pobiera quote/profile, fundamenty, ratios, estimates oraz historical
+prices dla wszystkich widocznych tickerow. Refresh pojedynczego wiersza uzywa
+tej samej pelnej sciezki odswiezania dla wybranej spolki.
+
+Pierwsze zaladowanie aplikacji tez wysyla `refreshScope: "full"`, zeby ekran
+nie ocenial spolek na podstawie starego cache. Cache w Supabase zostaje jako
+magazyn i awaryjne zrodlo, gdy provider zwroci blad.
+
+Pelny refresh buduje payload od zera. Jesli Yahoo nie zwroci ktorejs grupy
+danych, ta grupa nie jest uzupelniana starym cache, tylko trafia do score jako
+brakujaca metryka.
 
 ## Komponenty frontendu
 
@@ -112,14 +128,12 @@ Typy i utilsy:
 
 ## Sekrety Supabase
 
-```bash
-supabase secrets set FMP_API_KEY=...
-supabase secrets set FMP_BASE_URL=https://financialmodelingprep.com
-```
+Backend nie wymaga klucza API do danych rynkowych. Funkcje uzywaja
+`yahoo-finance2` po stronie Edge Functions.
 
-Funkcje uzywaja tez `SUPABASE_URL` i `SUPABASE_SERVICE_ROLE_KEY`. Supabase
-zwykle udostepnia je w runtime funkcji; dla lokalnego `supabase functions serve`
-ustaw je w lokalnym srodowisku albo jako sekrety projektu.
+Funkcje uzywaja `SUPABASE_URL` i `SUPABASE_SERVICE_ROLE_KEY`. Supabase zwykle
+udostepnia je w runtime funkcji; dla lokalnego `supabase functions serve` ustaw
+je w lokalnym srodowisku albo jako sekrety projektu.
 
 ## Baza danych
 
@@ -143,8 +157,8 @@ Dozwolone wartosci `watchlist_stocks.moat`:
 - `Bad`
 - `Unknown`
 
-Cache FMP i logi maja wlaczone RLS bez publicznych polityk. Sa obslugiwane przez
-Edge Functions na service role. `watchlist_stocks` ma polityki CRUD dla
+Cache danych rynkowych i logi maja wlaczone RLS bez publicznych polityk. Sa
+obslugiwane przez Edge Functions na service role. `watchlist_stocks` ma polityki CRUD dla
 zalogowanego uzytkownika na jego `user_id`.
 
 ## Edge Functions
@@ -191,11 +205,9 @@ a pozostale tickery beda dalej przetwarzane.
 - Fundamentals: 7 dni
 - Historical prices: 7 dni
 
-Jezeli odpowiednia czesc cache jest swieza, funkcja nie odpytuje FMP dla tej
+Jezeli odpowiednia czesc cache jest swieza, funkcja nie odpytuje Yahoo dla tej
 grupy danych. Batch endpoint jest cache-first: jesli dane juz sa w Supabase,
-frontend dostaje cache bez odpytywania FMP. `refreshScope: "quote"` odswieza
-ceny przez `/stable/batch-quote`, co dla calej tabeli kosztuje jeden request
-FMP.
+frontend dostaje cache bez odpytywania Yahoo.
 
 Pelny refresh (`refreshScope: "full"` lub `forceRefresh: true`) jest drozszy i
 powinien byc uzywany glownie przy dodawaniu nowego tickera albo recznym
@@ -203,7 +215,7 @@ uzupelnianiu danych.
 
 ## Obliczenia i fallbacki
 
-Jesli FMP nie zwroci gotowego pola, backend liczy je tylko wtedy, gdy ma
+Jesli Yahoo nie zwroci gotowego pola, backend liczy je tylko wtedy, gdy ma
 wystarczajace pola z raportow:
 
 - ROCE = EBIT / (Total Assets - Total Current Liabilities)
@@ -218,39 +230,38 @@ wystarczajace pola z raportow:
 Backend nie wypelnia metryk przyblizeniami, ktore zmieniaja znaczenie wskaznika.
 Na przyklad total liabilities nie sa traktowane jako total debt.
 
-## Endpointy FMP
+## Moduly Yahoo
 
-Funkcje uzywaja endpointow `/stable`:
+Funkcje uzywaja `yahoo-finance2` importowanego z JSR:
 
-- `/stable/profile`
-- `/stable/quote`
-- `/stable/batch-quote`
-- `/stable/historical-price-eod/full`
-- `/stable/income-statement`
-- `/stable/income-statement-growth`
-- `/stable/balance-sheet-statement`
-- `/stable/cash-flow-statement`
-- `/stable/ratios-ttm`
-- `/stable/key-metrics-ttm`
-- `/stable/analyst-estimates`
-- `/stable/grades-consensus`
+- `quote`
+- `historical`
+- `fundamentalsTimeSeries`
+- `quoteSummary`
 
-Klucz FMP jest wysylany w naglowku `apikey`, nie w URL.
+`quote` obsluguje szybkie odswiezanie cen, `historical` zasila wykres i
+performance, `fundamentalsTimeSeries` zasila raporty finansowe, a
+`quoteSummary` uzupelnia ratios, estimates i consensus.
 
 ## Score
 
-Score jest liczony w skali 0-100. Najwieksza wage ma ROCE, bo dashboard ma
-premiowac kapitalowo efektywne spolki jakosciowe:
+Score jest liczony w skali 0-100:
 
-- ROCE: 35 pkt
-- Operating margin: 15 pkt
-- FCF margin: 15 pkt
-- Gross margin: 10 pkt
-- Revenue growth: 5 pkt
-- EPS growth: 5 pkt
+- ROCE: 20 pkt
+- Gross margin: 7.5 pkt
+- Operating margin: 7.5 pkt
+- EPS + Revenue growth: 15 pkt (10/5)
+- FCF margin: 10 pkt
+- MOAT: 15 pkt (`Unknown` daje 3 pkt)
 - Valuation, preferowane PEG albo fallback P/E: 10 pkt
-- Debt/Equity: 5 pkt
+- Debt management: 10 pkt, preferuje Net Debt/EBITDA, fallback Debt/Equity
+- Analyst consensus: 5 pkt
 
-Brakujace dane nie zeruja spolki automatycznie. Missing metrics dostaja
-neutralny kredyt, zeby darmowy plan API nie karal nadmiernie firm, dla ktorych
-FMP nie oddal kompletu pol.
+Kazdy czynnik daje maksymalnie tyle punktow, ile wynosi jego waga. Brakujace
+metryki od providera daja 30% swojej maksymalnej wagi, zeby score nie karal
+zbyt mocno za niekompletne dane Yahoo, ale nadal byl konserwatywny.
+
+Red flags odejmuja punkty po score bazowym: kara za dlug tylko gdy
+Debt/Equity > 2 i Net Debt/EBITDA > 3 jednoczesnie; osobno ujemny FCF przez
+2 ostatnie lata. Tabela pokazuje tez krotki kontekst sektorowy: roznice
+score'u wzgledem sredniej spolek z tego samego sektora w watchliscie.
