@@ -24,6 +24,7 @@ import {
 import { computed, ref } from "vue";
 
 import AppTooltip from "@/components/AppTooltip.vue";
+import StockDetailDialog from "@/components/StockDetailDialog.vue";
 import StockRow from "@/components/StockRow.vue";
 import { useStocksStore } from "@/stores/useStocksStore";
 import type { StockRowData } from "@/types/stock";
@@ -31,6 +32,7 @@ import type { StockRowData } from "@/types/stock";
 const store = useStocksStore();
 const sorting = ref<SortingState>([{ id: "score", desc: true }]);
 const showColumnDialog = ref(false);
+const selectedTicker = ref<string | null>(null);
 const draggedColumnId = ref<string | null>(null);
 const dragOrderChanged = ref(false);
 const COLUMN_PREFS_KEY = "equity-fortress:table-columns";
@@ -63,10 +65,12 @@ const defaultColumnOrder = [
 ] as const;
 
 type ColumnId = (typeof defaultColumnOrder)[number];
+type RowDensity = "compact" | "default" | "comfortable";
 
 interface ColumnPrefs {
   order: ColumnOrderState;
   visibility: VisibilityState;
+  rowDensity: RowDensity;
 }
 
 const defaultColumnIdSet = new Set<string>(defaultColumnOrder);
@@ -156,6 +160,7 @@ const columnWidthClasses: Record<string, string> = {
 const initialColumnPrefs = readColumnPrefs();
 const columnVisibility = ref<VisibilityState>(initialColumnPrefs.visibility);
 const columnOrder = ref<ColumnOrderState>(initialColumnPrefs.order);
+const rowDensity = ref<RowDensity>(initialColumnPrefs.rowDensity);
 
 function readColumnPrefs(): ColumnPrefs {
   try {
@@ -164,11 +169,13 @@ function readColumnPrefs(): ColumnPrefs {
     return {
       order: normalizeColumnOrder(parsed.order),
       visibility: normalizeColumnVisibility(parsed.visibility),
+      rowDensity: normalizeRowDensity(parsed.rowDensity),
     };
   } catch (_error) {
     return {
       order: [...defaultColumnOrder],
       visibility: {},
+      rowDensity: "default",
     };
   }
 }
@@ -201,12 +208,17 @@ function normalizeColumnVisibility(value: unknown): VisibilityState {
   );
 }
 
+function normalizeRowDensity(value: unknown): RowDensity {
+  return value === "compact" || value === "comfortable" ? value : "default";
+}
+
 function persistColumnPrefs(): void {
   window.localStorage.setItem(
     COLUMN_PREFS_KEY,
     JSON.stringify({
       order: columnOrder.value,
       visibility: columnVisibility.value,
+      rowDensity: rowDensity.value,
     }),
   );
 }
@@ -269,6 +281,11 @@ const orderedConfigurableColumns = computed(() => {
 const visibleColumnIds = computed(() =>
   table.getVisibleLeafColumns().map((column) => column.id),
 );
+const selectedStock = computed(() =>
+  selectedTicker.value
+    ? store.stocks.find((stock) => stock.ticker === selectedTicker.value) ?? null
+    : null
+);
 
 function openColumnDialog(): void {
   showColumnDialog.value = true;
@@ -278,8 +295,27 @@ function closeColumnDialog(): void {
   showColumnDialog.value = false;
 }
 
+function openStockDetail(stock: StockRowData): void {
+  selectedTicker.value = stock.ticker;
+}
+
+function openTickerDetail(ticker: string): boolean {
+  const stock = store.stocks.find((stock) => stock.ticker === ticker);
+  if (!stock) {
+    return false;
+  }
+
+  selectedTicker.value = stock.ticker;
+  return true;
+}
+
+function closeStockDetail(): void {
+  selectedTicker.value = null;
+}
+
 defineExpose({
   openColumnDialog,
+  openTickerDetail,
 });
 
 function sortIcon(state: false | "asc" | "desc") {
@@ -346,6 +382,12 @@ function columnPosition(columnId: string): number {
 function resetColumns(): void {
   columnOrder.value = pinTickerFirst([...defaultColumnOrder]);
   columnVisibility.value = {};
+  rowDensity.value = "default";
+  persistColumnPrefs();
+}
+
+function setRowDensity(value: RowDensity): void {
+  rowDensity.value = value;
   persistColumnPrefs();
 }
 
@@ -424,6 +466,17 @@ function columnWidthClass(columnId: string): string {
   return columnWidthClasses[columnId] ?? "w-28 min-w-28";
 }
 
+function tableDensityClass(): string {
+  switch (rowDensity.value) {
+    case "compact":
+      return "table-density-compact";
+    case "comfortable":
+      return "table-density-comfortable";
+    case "default":
+      return "table-density-default";
+  }
+}
+
 function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
   return [
     "ticker",
@@ -459,7 +512,7 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
               id="column-dialog-title"
               class="text-sm font-bold text-zinc-900 dark:text-zinc-100"
             >
-              Columns
+              Customize table
             </h2>
             <span
               class="text-xs font-semibold text-zinc-500 dark:text-zinc-400"
@@ -492,6 +545,28 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
         </div>
 
         <div class="overflow-y-auto p-3">
+          <div
+            class="mb-3 rounded-md border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/80"
+          >
+            <div class="mb-2 text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400">
+              Row density
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                v-for="density in (['compact', 'default', 'comfortable'] as RowDensity[])"
+                :key="density"
+                type="button"
+                class="h-9 rounded-md border px-3 text-xs font-bold capitalize transition"
+                :class="rowDensity === density
+                  ? 'border-cyan-300 bg-cyan-50 text-cyan-800 shadow-sm dark:border-cyan-700 dark:bg-cyan-950 dark:text-cyan-100'
+                  : 'border-zinc-300 bg-white text-zinc-700 hover:border-cyan-300 hover:bg-cyan-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950'"
+                @click="setRowDensity(density)"
+              >
+                {{ density }}
+              </button>
+            </div>
+          </div>
+
           <div class="grid gap-2">
             <div
               v-for="column in orderedConfigurableColumns"
@@ -565,7 +640,10 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
     <div
       class="table-scroll max-h-[calc(100vh-180px)] min-h-[800px] overflow-x-scroll overflow-y-auto"
     >
-      <table class="w-max min-w-[2500px] border-separate border-spacing-0">
+      <table
+        class="w-max min-w-[2500px] border-separate border-spacing-0"
+        :class="tableDensityClass()"
+      >
         <thead>
           <tr
             v-for="headerGroup in table.getHeaderGroups()"
@@ -615,6 +693,8 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
             :key="row.id"
             :row="row"
             :visible-column-ids="visibleColumnIds"
+            :density="rowDensity"
+            @open-detail="openStockDetail"
             @refresh="store.refreshStock"
             @remove="store.removeTicker"
             @update-moat="store.updateMoat"
@@ -630,5 +710,11 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
         {{ store.stocks.length === 0 ? "No stocks in this portfolio" : "No matching stocks" }}
       </div>
     </div>
+
+    <StockDetailDialog
+      v-if="selectedStock"
+      :stock="selectedStock"
+      @close="closeStockDetail"
+    />
   </section>
 </template>

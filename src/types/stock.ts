@@ -10,6 +10,7 @@ export type Moat =
 export interface ChartPoint {
   date: string;
   close: number;
+  volume?: number;
 }
 
 export interface StockData {
@@ -17,6 +18,7 @@ export interface StockData {
   company: string | null;
   currentPrice: number | null;
   oneYearChart: ChartPoint[];
+  historicalChart: ChartPoint[];
   performance1W: number | null;
   performance1Y: number | null;
   performance3Y: number | null;
@@ -41,6 +43,11 @@ export interface StockData {
   scorePenalty: number;
   score: number | null;
   lastUpdated: string | null;
+}
+
+export interface StockHistoryData {
+  ticker: string;
+  historicalChart: ChartPoint[];
 }
 
 export interface StockRowData extends StockData {

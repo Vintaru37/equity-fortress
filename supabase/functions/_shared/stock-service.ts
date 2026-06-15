@@ -8,6 +8,7 @@ import type {
   JsonRecord,
   Moat,
   StockData,
+  StockHistoryData,
 } from "./types.ts";
 import {
   fetchYahooFundamentalsPayload,
@@ -321,6 +322,18 @@ export async function loadStocksBatchData(
   return stocks;
 }
 
+export async function loadStockHistoricalChart(
+  ticker: string,
+): Promise<StockHistoryData> {
+  const today = toIsoDate(new Date());
+  const historical = await fetchYahooHistoricalRecords(ticker, "1900-01-01", today);
+
+  return {
+    ticker,
+    historicalChart: normalizeHistoricalPoints(historical),
+  };
+}
+
 export function emptyStockData(
   ticker: string,
   moat: Moat = "Unknown",
@@ -331,6 +344,7 @@ export function emptyStockData(
     company: null,
     currentPrice: null,
     oneYearChart: [],
+    historicalChart: [],
     performance1W: null,
     performance1Y: null,
     performance3Y: null,
@@ -904,6 +918,7 @@ export function composeStockData(
       firstString(quote, ["name", "companyName"]),
     currentPrice: roundNumber(currentPrice),
     oneYearChart: performance.oneYearChart,
+    historicalChart: historical,
     performance1W: roundNumber(performance.performance1W),
     performance1Y: roundNumber(performance.performance1Y),
     performance3Y: roundNumber(performance.performance3Y),
@@ -1206,8 +1221,8 @@ function estimatedNextYearEps(estimates: JsonRecord[]): number | null {
   return low !== null && high !== null ? (low + high) / 2 : null;
 }
 
-function calculatePerformance(points: Array<{ date: string; close: number }>) {
-  const oneYearChart: Array<{ date: string; close: number }> = [];
+function calculatePerformance(points: Array<{ date: string; close: number; volume?: number }>) {
+  const oneYearChart: Array<{ date: string; close: number; volume?: number }> = [];
   const result = {
     oneYearChart,
     performance1W: null as number | null,
@@ -1283,14 +1298,23 @@ function findAtOrBefore(
 
 function normalizeHistoricalPoints(
   records: JsonRecord[],
-): Array<{ date: string; close: number }> {
+): Array<{ date: string; close: number; volume?: number }> {
   return records
     .map((record) => {
       const date = firstString(record, ["date"]);
       const close = firstNumber(record, ["close", "adjClose", "price"]);
-      return date && close !== null ? { date, close } : null;
+      const volume = firstNumber(record, ["volume"]);
+      return date && close !== null
+        ? {
+          date,
+          close,
+          ...(volume !== null ? { volume } : {}),
+        }
+        : null;
     })
-    .filter((point): point is { date: string; close: number } => point !== null)
+    .filter((point): point is { date: string; close: number; volume?: number } =>
+      point !== null
+    )
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 

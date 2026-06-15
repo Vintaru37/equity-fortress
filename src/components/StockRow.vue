@@ -14,17 +14,25 @@ import {
   formatNumber,
 } from "@/utils/formatters";
 
+type RowDensity = "compact" | "default" | "comfortable";
+
 const props = defineProps<{
   row: Row<StockRowData>;
   visibleColumnIds: string[];
+  density: RowDensity;
 }>();
 
 const emit = defineEmits<{
+  openDetail: [stock: StockRowData];
   refresh: [ticker: string];
   remove: [ticker: string];
   updateMoat: [ticker: string, moat: Moat];
   updateNotes: [ticker: string, notes: string];
 }>();
+
+function openDetail(): void {
+  emit("openDetail", props.row.original);
+}
 
 function refresh(): void {
   emit("refresh", props.row.original.ticker);
@@ -53,10 +61,14 @@ function hasScoreDetails(stock: StockRowData): boolean {
 
 <template>
   <tr
-    class="stock-row group transition"
+    class="stock-row group cursor-pointer transition"
     :class="row.original.rowError
       ? 'stock-row-error'
       : ''"
+    tabindex="0"
+    :aria-label="`Open ${row.original.ticker} details`"
+    @click="openDetail"
+    @keydown.enter="openDetail"
   >
     <template
       v-for="columnId in visibleColumnIds"
@@ -76,7 +88,12 @@ function hasScoreDetails(stock: StockRowData): boolean {
         </div>
       </td>
 
-      <td v-else-if="columnId === 'actions'" class="table-cell w-24 min-w-24">
+      <td
+        v-else-if="columnId === 'actions'"
+        class="table-cell w-24 min-w-24"
+        @click.stop
+        @keydown.stop
+      >
         <div class="flex items-center gap-1 opacity-80">
           <RefreshButton
             compact
@@ -110,7 +127,10 @@ function hasScoreDetails(stock: StockRowData): boolean {
       </td>
 
       <td v-else-if="columnId === 'oneYearChart'" class="table-cell w-48 min-w-48">
-        <SparklineChart :points="row.original.oneYearChart" />
+        <SparklineChart
+          :points="row.original.oneYearChart"
+          :density="density"
+        />
       </td>
 
       <td v-else-if="columnId === 'performance1W'" class="table-cell numeric-cell w-28 min-w-28">
@@ -172,7 +192,12 @@ function hasScoreDetails(stock: StockRowData): boolean {
         <MetricBadge :value="row.original.beta" kind="beta" :decimals="2" />
       </td>
 
-      <td v-else-if="columnId === 'moat'" class="table-cell w-36 min-w-36">
+      <td
+        v-else-if="columnId === 'moat'"
+        class="table-cell w-36 min-w-36"
+        @click.stop
+        @keydown.stop
+      >
         <MoatSelect
           :model-value="row.original.moat"
           @update:model-value="updateMoat"
@@ -204,10 +229,16 @@ function hasScoreDetails(stock: StockRowData): boolean {
         </div>
       </td>
 
-      <td v-else-if="columnId === 'notes'" class="table-cell w-72 min-w-72">
+      <td
+        v-else-if="columnId === 'notes'"
+        class="table-cell w-72 min-w-72"
+        @click.stop
+        @keydown.stop
+      >
         <StockNotes
           :model-value="row.original.notes"
           :ticker="row.original.ticker"
+          :density="density"
           @update:model-value="updateNotes"
         />
       </td>

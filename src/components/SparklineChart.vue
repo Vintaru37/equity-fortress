@@ -9,8 +9,11 @@ import type { ChartPoint } from "@/types/stock";
 
 use([LineChart, GridComponent, CanvasRenderer]);
 
+type RowDensity = "compact" | "default" | "comfortable";
+
 const props = defineProps<{
   points: ChartPoint[];
+  density?: RowDensity;
 }>();
 
 const chartEl = ref<HTMLDivElement | null>(null);
@@ -27,6 +30,16 @@ const strokeColor = computed(() => {
   const first = props.points[0].close;
   const last = props.points[props.points.length - 1].close;
   return last >= first ? "#059669" : "#dc2626";
+});
+const sizeClass = computed(() => {
+  switch (props.density ?? "default") {
+    case "compact":
+      return "h-10 w-32";
+    case "comfortable":
+      return "h-14 w-40";
+    case "default":
+      return "h-12 w-36";
+  }
 });
 
 function renderChart(): void {
@@ -112,7 +125,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="h-12 w-36">
+  <div :class="sizeClass">
     <div v-if="hasData" ref="chartEl" class="h-full w-full" />
     <div
       v-else

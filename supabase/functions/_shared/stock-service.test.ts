@@ -149,6 +149,13 @@ Deno.test("composeStockData calculates performance windows from historical close
     { date: "2025-05-25", close: 90 },
     { date: "2025-06-01", close: 100 },
   ]);
+  assertEquals(stock.historicalChart, [
+    { date: "2020-06-01", close: 50 },
+    { date: "2022-06-01", close: 60 },
+    { date: "2024-06-01", close: 80 },
+    { date: "2025-05-25", close: 90 },
+    { date: "2025-06-01", close: 100 },
+  ]);
 });
 
 Deno.test("calculateScore gives 30 percent credit for missing provider metrics", () => {
@@ -233,6 +240,7 @@ function emptyStockData(): StockData {
     company: null,
     currentPrice: null,
     oneYearChart: [],
+    historicalChart: [],
     performance1W: null,
     performance1Y: null,
     performance3Y: null,

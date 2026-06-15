@@ -13,7 +13,7 @@ import ThemeToggle from "@/components/ThemeToggle.vue";
 import logoUrl from "@/assets/images/logo.png";
 import { useStocksStore } from "@/stores/useStocksStore";
 import { useThemeStore } from "@/stores/useThemeStore";
-import { formatDateTime } from "@/utils/formatters";
+import { formatDateTime, normalizeTickerInput } from "@/utils/formatters";
 
 const store = useStocksStore();
 useThemeStore();
@@ -27,6 +27,15 @@ onMounted(() => {
 
 function openColumns(): void {
   stockTableRef.value?.openColumnDialog();
+}
+
+function openExactSearchTicker(): void {
+  const ticker = normalizeTickerInput(store.filter);
+  if (!ticker) {
+    return;
+  }
+
+  stockTableRef.value?.openTickerDetail(ticker);
 }
 
 async function clearAllNotes(): Promise<void> {
@@ -81,6 +90,7 @@ async function clearAllNotes(): Promise<void> {
             type="search"
             placeholder="Search ticker or company"
             aria-label="Search ticker or company"
+            @keydown.enter="openExactSearchTicker"
           />
         </div>
 

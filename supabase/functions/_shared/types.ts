@@ -11,7 +11,8 @@ export interface StockData {
   ticker: string;
   company: string | null;
   currentPrice: number | null;
-  oneYearChart: Array<{ date: string; close: number }>;
+  oneYearChart: Array<{ date: string; close: number; volume?: number }>;
+  historicalChart: Array<{ date: string; close: number; volume?: number }>;
   performance1W: number | null;
   performance1Y: number | null;
   performance3Y: number | null;
@@ -36,6 +37,11 @@ export interface StockData {
   scorePenalty: number;
   score: number | null;
   lastUpdated: string | null;
+}
+
+export interface StockHistoryData {
+  ticker: string;
+  historicalChart: Array<{ date: string; close: number; volume?: number }>;
 }
 
 export type JsonRecord = Record<string, unknown>;

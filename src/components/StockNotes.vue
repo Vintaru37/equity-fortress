@@ -7,6 +7,7 @@ import AppTooltip from "@/components/AppTooltip.vue";
 const props = defineProps<{
   modelValue: string;
   ticker: string;
+  density?: "compact" | "default" | "comfortable";
 }>();
 
 const emit = defineEmits<{
@@ -39,13 +40,25 @@ function sourceLabel(url: string): string {
     return "Source";
   }
 }
+
+const textareaClass = computed(() => {
+  switch (props.density ?? "default") {
+    case "compact":
+      return "h-16";
+    case "comfortable":
+      return "h-28";
+    case "default":
+      return "h-24";
+  }
+});
 </script>
 
 <template>
   <div class="grid gap-1.5">
     <div class="relative">
       <textarea
-        class="h-24 w-64 resize-none rounded-md border border-zinc-200 bg-white px-2 py-1.5 pr-10 text-xs text-zinc-700 shadow-inner transition placeholder:text-zinc-400 focus:border-cyan-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+        class="w-64 resize-none rounded-md border border-zinc-200 bg-white px-2 py-1.5 pr-9 text-xs text-zinc-700 shadow-inner transition placeholder:text-zinc-400 focus:border-cyan-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+        :class="textareaClass"
         :value="modelValue"
         :aria-label="`${ticker} notes`"
         placeholder="Notes"
@@ -55,7 +68,7 @@ function sourceLabel(url: string): string {
       <AppTooltip text="Clear notes">
         <button
           type="button"
-          class="absolute right-2 top-0 inline-flex h-7 w-7 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-300"
+          class="absolute right-4 top-0 inline-flex h-6 w-6 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-300"
           :disabled="modelValue.trim() === ''"
           :aria-label="`Clear ${ticker} notes`"
           @click="clearNotes"

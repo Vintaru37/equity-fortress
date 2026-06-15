@@ -8,16 +8,17 @@ import {
   supabaseRestUrl,
 } from "@/utils/supabaseApi";
 import {
-  latestTimestamp,
   normalizeTickerInput,
 } from "@/utils/formatters";
 import { calculateScore } from "@/utils/score";
 import { MOAT_OPTIONS } from "@/types/stock";
 import type {
+  ChartPoint,
   Moat,
   PersistedStocksState,
   Portfolio,
   StockData,
+  StockHistoryData,
   StockRowData,
 } from "@/types/stock";
 
@@ -201,6 +202,7 @@ function emptyStock(ticker: string, moat: Moat = "Unknown"): StockData {
     company: null,
     currentPrice: null,
     oneYearChart: [],
+    historicalChart: [],
     performance1W: null,
     performance1Y: null,
     performance3Y: null,
@@ -290,6 +292,18 @@ function chunk<TValue>(values: TValue[], size: number): TValue[][] {
   return chunks;
 }
 
+function representativeTimestamp(values: Array<string | null>): string | null {
+  const timestamps = values
+    .filter((value): value is string => Boolean(value))
+    .sort();
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return timestamps[Math.floor((timestamps.length - 1) / 2)];
+}
+
 export const useStocksStore = defineStore("stocks", () => {
   const auth = useAuthStore();
   const persisted = readPersistedState();
@@ -308,7 +322,7 @@ export const useStocksStore = defineStore("stocks", () => {
   const initialized = ref(false);
   const error = ref<string | null>(null);
   const lastUpdated = ref<string | null>(
-    latestTimestamp(stocks.value.map((stock) => stock.lastUpdated)),
+    representativeTimestamp(stocks.value.map((stock) => stock.lastUpdated)),
   );
 
   const activePortfolio = computed(() =>
@@ -363,7 +377,7 @@ export const useStocksStore = defineStore("stocks", () => {
       [portfolioId]: {
         stocks: portfolioStocks,
         initialized: portfolioInitialized,
-        lastUpdated: latestTimestamp(
+        lastUpdated: representativeTimestamp(
           portfolioStocks.map((stock) => stock.lastUpdated),
         ),
       },
@@ -488,6 +502,27 @@ export const useStocksStore = defineStore("stocks", () => {
     return batches.flat();
   }
 
+  async function loadStockHistory(ticker: string): Promise<ChartPoint[]> {
+    const normalizedTicker = normalizeTickerInput(ticker);
+    if (!normalizedTicker) {
+      throw new Error("Invalid ticker");
+    }
+
+    const response = await callEdgeFunction<StockHistoryData>("get-stock-history", {
+      ticker: normalizedTicker,
+    });
+    const historicalChart = response.historicalChart ?? [];
+
+    stocks.value = stocks.value.map((stock) =>
+      stock.ticker === response.ticker
+        ? { ...stock, historicalChart }
+        : stock
+    );
+    cacheActivePortfolio();
+
+    return historicalChart;
+  }
+
   function mergeStock(stock: StockData, rowError: string | null = null): void {
     const index = stocks.value.findIndex((item) => item.ticker === stock.ticker);
     const existing = index >= 0 ? stocks.value[index] : null;
@@ -521,7 +556,9 @@ export const useStocksStore = defineStore("stocks", () => {
   }
 
   function updateLastUpdated(): void {
-    lastUpdated.value = latestTimestamp(stocks.value.map((stock) => stock.lastUpdated));
+    lastUpdated.value = representativeTimestamp(
+      stocks.value.map((stock) => stock.lastUpdated),
+    );
     cacheActivePortfolio();
   }
 
@@ -1330,6 +1367,7 @@ export const useStocksStore = defineStore("stocks", () => {
     renamePortfolio,
     deletePortfolio,
     loadInitialStocks,
+    loadStockHistory,
     refreshStock,
     refreshAll,
     addTicker,

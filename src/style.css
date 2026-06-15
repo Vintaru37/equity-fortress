@@ -58,7 +58,19 @@ textarea:focus-visible {
 }
 
 .table-cell {
-  @apply border-b border-zinc-200/80 px-3 py-3 text-left align-middle text-sm text-zinc-800 transition-colors dark:border-zinc-800 dark:text-zinc-200;
+  @apply border-b border-zinc-200/80 text-left align-middle text-sm text-zinc-800 transition-colors dark:border-zinc-800 dark:text-zinc-200;
+}
+
+.table-density-compact .table-cell {
+  @apply px-2 py-2;
+}
+
+.table-density-default .table-cell {
+  @apply px-3 py-3;
+}
+
+.table-density-comfortable .table-cell {
+  @apply px-4 py-4;
 }
 
 .table-header-cell {
@@ -86,7 +98,7 @@ textarea:focus-visible {
 }
 
 .dark .stock-row:hover > .table-cell {
-  background-color: rgb(8 51 68 / 0.4);
+  background-color: #083344;
 }
 
 .dark .stock-row.stock-row-error > .table-cell {
@@ -101,6 +113,7 @@ textarea:focus-visible {
   position: sticky !important;
   left: 0;
   z-index: 80;
+  background-clip: padding-box;
   box-shadow: 1px 0 0 rgb(228 228 231 / 0.8);
 }
 

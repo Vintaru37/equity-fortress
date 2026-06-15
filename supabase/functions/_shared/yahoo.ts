@@ -73,6 +73,7 @@ export async function fetchYahooHistoricalRecords(
       compactRecord({
         date: isoDate(record.date),
         close: firstNumber(record, ["adjClose", "close"]),
+        volume: firstNumber(record, ["volume"]),
       })
     )
     .filter((record) => typeof record.date === "string" && record.close !== undefined)
