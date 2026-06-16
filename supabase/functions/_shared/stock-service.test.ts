@@ -1,6 +1,7 @@
 import {
   calculateScore,
   composeStockData,
+  createRefreshPayload,
 } from "./stock-service.ts";
 import type {
   CachedStockPayload,
@@ -153,6 +154,50 @@ Deno.test("composeStockData calculates performance windows from historical close
     { date: "2020-06-01", close: 50 },
     { date: "2022-06-01", close: 60 },
     { date: "2024-06-01", close: 80 },
+    { date: "2025-05-25", close: 90 },
+    { date: "2025-06-01", close: 100 },
+  ]);
+});
+
+Deno.test("composeStockData accepts chart-module lowercase adjusted closes", () => {
+  const payload: CachedStockPayload = {
+    quote: {
+      price: 100,
+    },
+    historical: [
+      { date: "2024-06-01", adjclose: 80 },
+      { date: "2025-05-25", adjclose: 90 },
+      { date: "2025-06-01", adjclose: 100 },
+    ],
+  };
+
+  const stock = composeStockData("TEST", payload, "Unknown", cacheRow);
+
+  assertEquals(stock.performance1W, 11.11);
+  assertEquals(stock.performance1Y, 25);
+  assertEquals(stock.oneYearChart, [
+    { date: "2024-06-01", close: 80 },
+    { date: "2025-05-25", close: 90 },
+    { date: "2025-06-01", close: 100 },
+  ]);
+});
+
+Deno.test("createRefreshPayload preserves cached historical data for partial full refreshes", () => {
+  const cachedPayload: CachedStockPayload = {
+    quote: { price: 100 },
+    historical: [
+      { date: "2025-05-25", close: 90 },
+      { date: "2025-06-01", close: 100 },
+    ],
+  };
+
+  const nextPayload = createRefreshPayload(cachedPayload);
+  nextPayload.quote = { price: 110 };
+
+  const stock = composeStockData("TEST", nextPayload, "Unknown", cacheRow);
+
+  assertEquals(stock.currentPrice, 110);
+  assertEquals(stock.oneYearChart, [
     { date: "2025-05-25", close: 90 },
     { date: "2025-06-01", close: 100 },
   ]);

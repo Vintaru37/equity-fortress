@@ -151,9 +151,7 @@ export async function loadStockData(
     return composeStockData(ticker, cachedPayload, moat, cacheRow);
   }
 
-  const nextPayload: CachedStockPayload = forceRefresh
-    ? {}
-    : { ...cachedPayload };
+  const nextPayload = createRefreshPayload(cachedPayload);
   const timestampPatch: Partial<CacheRow> = {};
   const allErrors: string[] = [];
 
@@ -370,6 +368,12 @@ export function emptyStockData(
     score: null,
     lastUpdated,
   };
+}
+
+export function createRefreshPayload(
+  cachedPayload: CachedStockPayload,
+): CachedStockPayload {
+  return { ...cachedPayload };
 }
 
 export async function logRefresh(
@@ -1302,7 +1306,7 @@ function normalizeHistoricalPoints(
   return records
     .map((record) => {
       const date = firstString(record, ["date"]);
-      const close = firstNumber(record, ["close", "adjClose", "price"]);
+      const close = firstNumber(record, ["close", "adjClose", "adjclose", "price"]);
       const volume = firstNumber(record, ["volume"]);
       return date && close !== null
         ? {

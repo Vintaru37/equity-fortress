@@ -1,4 +1,4 @@
-import YahooFinance from "jsr:@gadicc/yahoo-finance2@3.15.2";
+import YahooFinance from "jsr:@gadicc/yahoo-finance2@3.15.3";
 import type { CachedStockPayload, JsonRecord } from "./types.ts";
 
 type YahooFinanceClient = InstanceType<typeof YahooFinance>;
@@ -60,6 +60,20 @@ export async function fetchYahooHistoricalRecords(
   from: string,
   to: string,
 ): Promise<JsonRecord[]> {
+  const chart = await getYahooFinance().chart(ticker, {
+    period1: from,
+    period2: to,
+    interval: "1d",
+    return: "array",
+  } as Record<string, unknown>);
+  const chartRecords = isRecord(chart)
+    ? normalizeHistoricalPriceRecords(recordArray(chart.quotes))
+    : [];
+
+  if (chartRecords.length > 0) {
+    return chartRecords;
+  }
+
   const history = await getYahooFinance().historical(ticker, {
     period1: from,
     period2: to,
@@ -68,11 +82,24 @@ export async function fetchYahooHistoricalRecords(
     includeAdjustedClose: true,
   });
 
-  return recordArray(history)
+  const records = normalizeHistoricalPriceRecords(recordArray(history));
+
+  if (records.length === 0) {
+    throw new YahooFinanceError(
+      "historical",
+      `Yahoo returned no historical prices for ${ticker}`,
+    );
+  }
+
+  return records;
+}
+
+function normalizeHistoricalPriceRecords(records: JsonRecord[]): JsonRecord[] {
+  return records
     .map((record) =>
       compactRecord({
         date: isoDate(record.date),
-        close: firstNumber(record, ["adjClose", "close"]),
+        close: firstNumber(record, ["adjClose", "adjclose", "close"]),
         volume: firstNumber(record, ["volume"]),
       })
     )
