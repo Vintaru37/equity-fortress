@@ -203,18 +203,18 @@ Deno.test("createRefreshPayload preserves cached historical data for partial ful
   ]);
 });
 
-Deno.test("calculateScore gives 30 percent credit for missing provider metrics", () => {
-  assertEquals(calculateScore(emptyStockData()), 29);
+Deno.test("calculateScore returns null when no score inputs are available", () => {
+  assertEquals(calculateScore(emptyStockData()), null);
 });
 
-Deno.test("calculateScore adds moat points while unknown moat remains low credit", () => {
+Deno.test("calculateScore adds moat points while unknown moat remains zero", () => {
   assertEquals(calculateScore({
     ...emptyStockData(),
     moat: "Good",
-  }), 38);
+  }), 6);
 });
 
-Deno.test("calculateScore applies weighted metric points with missing-metric credit", () => {
+Deno.test("calculateScore applies the 100-point fundamentals, risks, and catalysts system", () => {
   const score = calculateScore({
     ...emptyStockData(),
     roce: 22,
@@ -223,12 +223,17 @@ Deno.test("calculateScore applies weighted metric points with missing-metric cre
     grossMargin: 64,
     revenueGrowth: 12,
     epsGrowth: 16,
-    peg: 1.4,
+    pe: 20,
+    forwardPe: 14,
     netDebtToEbitda: 1.7,
     debtToEquity: 0.4,
+    customerDependenceScore: 4,
     analystConsensus: "Buy",
     beta: 0.95,
     moat: "Excellent",
+    smartMoneyScore: 12,
+    backlogScore: 8,
+    buybacksScore: 4,
   });
 
   assertEquals(score, 82);
@@ -245,16 +250,21 @@ Deno.test("calculateScore gives small moat credit when moat is unknown", () => {
     revenueGrowth: 20,
     netDebtToEbitda: 0.5,
     debtToEquity: 0.2,
-    peg: 0.8,
+    pe: 20,
+    forwardPe: 10,
+    customerDependenceScore: 5,
     analystConsensus: "Strong Buy",
     beta: 0.7,
     moat: "Unknown",
+    smartMoneyScore: 15,
+    backlogScore: 10,
+    buybacksScore: 5,
   });
 
-  assertEquals(score, 87);
+  assertEquals(score, 89);
 });
 
-Deno.test("calculateScore applies red flag penalties after base score", () => {
+Deno.test("calculateScore ignores legacy red flag penalties because risk is scored directly", () => {
   assertEquals(calculateScore({
     ...emptyStockData(),
     roce: 45,
@@ -264,24 +274,29 @@ Deno.test("calculateScore applies red flag penalties after base score", () => {
     fcfMargin: 30,
     revenueGrowth: 20,
     netDebtToEbitda: 5,
-    peg: 0.8,
+    pe: 20,
+    forwardPe: 10,
     analystConsensus: "Strong Buy",
     moat: "Excellent",
     scorePenalty: 10,
     redFlags: ["Net Debt/EBITDA > 4"],
-  }), 80);
+  }), 55);
 });
 
-Deno.test("calculateScore keeps unknown moat low while other missing metrics get partial credit", () => {
+Deno.test("calculateScore ignores analyst consensus in the current scoring system", () => {
   assertEquals(calculateScore({
     ...emptyStockData(),
     analystConsensus: "Hold",
-  }), 30);
+  }), null);
 });
 
 function emptyStockData(): StockData {
   return {
     ticker: "TEST",
+    customerDependenceScore: null,
+    smartMoneyScore: null,
+    backlogScore: null,
+    buybacksScore: null,
     company: null,
     currentPrice: null,
     oneYearChart: [],

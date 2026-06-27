@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@gadicc/yahoo-finance2@3.15.2": "3.15.2",
+    "jsr:@gadicc/yahoo-finance2@3.15.3": "3.15.3",
     "npm:@lucide/vue@^1.18.0": "1.18.0_vue@3.5.38__typescript@5.9.3_typescript@5.9.3",
     "npm:@tanstack/vue-table@^8.21.3": "8.21.3_vue@3.5.38__typescript@5.9.3_typescript@5.9.3",
     "npm:@types/json-schema@^7.0.15": "7.0.15",
@@ -21,6 +22,13 @@
   "jsr": {
     "@gadicc/yahoo-finance2@3.15.2": {
       "integrity": "ee4f541dae4e24f45398ca8a5af6061583431c905dd7bbef9922a11e7a143d58",
+      "dependencies": [
+        "npm:@types/json-schema",
+        "npm:tough-cookie"
+      ]
+    },
+    "@gadicc/yahoo-finance2@3.15.3": {
+      "integrity": "43211debf9f529ea06b5755c59742be1c9edfb1d36bf80e26c9bc3be3848e326",
       "dependencies": [
         "npm:@types/json-schema",
         "npm:tough-cookie"

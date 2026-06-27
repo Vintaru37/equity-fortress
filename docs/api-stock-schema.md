@@ -46,6 +46,10 @@ The backend normalizes, deduplicates, and caps the ticker list at 25 symbols.
 ```ts
 interface StockData {
   ticker: string;
+  customerDependenceScore: number | null;
+  smartMoneyScore: number | null;
+  backlogScore: number | null;
+  buybacksScore: number | null;
   company: string | null;
   currentPrice: number | null;
   oneYearChart: Array<{ date: string; close: number }>;
@@ -68,7 +72,7 @@ interface StockData {
   beta: number | null;
   sector: string | null;
   industry: string | null;
-  moat: "Excellent" | "Good" | "Average" | "Bad" | "Unknown";
+  moat: "Excellent" | "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Unknown";
   redFlags: string[];
   scorePenalty: number;
   score: number | null;
@@ -81,6 +85,10 @@ interface StockData {
 | Field | Type | Source | Notes |
 | --- | --- | --- | --- |
 | `ticker` | `string` | Request | Normalized uppercase ticker. |
+| `customerDependenceScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for customer/contract/funding dependence; higher means safer. Edge responses set it to `null`, then the frontend merges portfolio state. |
+| `smartMoneyScore` | `number \| null` | Supabase/local portfolio | Manual 0-15 score for politicians, governments, institutions, insiders, and Wall Street activity. |
+| `backlogScore` | `number \| null` | Supabase/local portfolio | Manual 0-10 score for new contracts, AI exposure, partnerships, and backlog. |
+| `buybacksScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for active share repurchases. |
 | `company` | `string \| null` | Yahoo `quote` / `quoteSummary.price` | Uses long/short company name when available. |
 | `currentPrice` | `number \| null` | Yahoo `quote` / `quoteSummary.financialData` | Current, regular, post-market, or pre-market price fallback. |
 | `oneYearChart` | `{ date, close }[]` | Calculated from Yahoo `historical` | Last year of daily close points. |
@@ -104,9 +112,9 @@ interface StockData {
 | `sector` | `string \| null` | Yahoo `quoteSummary.assetProfile` | Used by the frontend for watchlist sector comparison. |
 | `industry` | `string \| null` | Yahoo `quoteSummary.assetProfile` | Informational company classification. |
 | `moat` | enum | Supabase `watchlist_stocks` | User/app-maintained field, not from Yahoo. |
-| `redFlags` | `string[]` | Calculated | Severe leverage / cash-flow warnings used as score penalties. |
-| `scorePenalty` | `number` | Calculated | Points subtracted after the base score, capped at 20. |
-| `score` | `number \| null` | Calculated | 0-100 quality score from profitability, growth, valuation, and debt metrics. |
+| `redFlags` | `string[]` | Calculated | Legacy warnings shown in the UI; not subtracted from the current score. |
+| `scorePenalty` | `number` | Calculated | Legacy warning points kept for UI context; not subtracted from the current score. |
+| `score` | `number \| null` | Calculated | 0-100 score from Fundamentals, Risks, and Catalysts & Valuation. |
 | `lastUpdated` | `string \| null` | Supabase cache timestamps | Latest quote/fundamentals/historical cache timestamp. |
 
 All numeric display fields are rounded to 2 decimals.
@@ -142,21 +150,18 @@ The score is a 0-100 weighted score:
 | Factor | Weight |
 | --- | ---: |
 | ROCE | 20 |
-| Gross margin | 7.5 |
-| Operating margin | 7.5 |
-| EPS growth + revenue growth | 15 |
-| FCF margin | 10 |
-| MOAT | 15 |
-| Valuation, PEG preferred then P/E fallback | 10 |
-| Debt management, Net Debt/EBITDA preferred then Debt/Equity fallback | 10 |
-| Analyst consensus | 5 |
+| Gross margin | 10 |
+| Revenue growth + FCF margin | 10 |
+| Debt + manual dependence | 15 |
+| MOAT / competitiveness | 10 |
+| Valuation, Forward P/E vs P/E | 5 |
+| Manual Smart Money & Insiders | 15 |
+| Manual New Contracts / AI / Backlog | 10 |
+| Manual Buybacks | 5 |
 
-Each factor contributes up to its listed weight. Missing provider metrics
-contribute 30% of their maximum weight, which avoids over-penalizing incomplete
-Yahoo data while staying conservative. `MOAT: Unknown` contributes 3 points.
-Red flags are deducted after the base score: debt penalty only when
-`Debt/Equity > 2` and `Net Debt/EBITDA > 3` are both true; FCF negative for
-the latest 2 annual periods is penalized separately.
+Each factor contributes up to its listed weight. Missing provider metrics and
+unset manual scores contribute 0 points. `MOAT: Unknown` contributes 0 points.
+If no scoring inputs are available, `score` is `null`.
 
 ## Cached Provider Payload
 

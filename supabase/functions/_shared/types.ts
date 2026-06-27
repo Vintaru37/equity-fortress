@@ -7,7 +7,14 @@ export type Moat =
   | "Very Bad"
   | "Unknown";
 
-export interface StockData {
+export interface ManualScores {
+  customerDependenceScore: number | null;
+  smartMoneyScore: number | null;
+  backlogScore: number | null;
+  buybacksScore: number | null;
+}
+
+export interface StockData extends ManualScores {
   ticker: string;
   company: string | null;
   currentPrice: number | null;

@@ -65,7 +65,7 @@ export async function fetchYahooHistoricalRecords(
     period2: to,
     interval: "1d",
     return: "array",
-  } as Record<string, unknown>);
+  });
   const chartRecords = isRecord(chart)
     ? normalizeHistoricalPriceRecords(recordArray(chart.quotes))
     : [];

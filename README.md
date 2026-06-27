@@ -340,20 +340,19 @@ performance, `fundamentalsTimeSeries` zasila raporty finansowe, a
 Score jest liczony w skali 0-100:
 
 - ROCE: 20 pkt
-- Gross margin: 7.5 pkt
-- Operating margin: 7.5 pkt
-- EPS + Revenue growth: 15 pkt (10/5)
-- FCF margin: 10 pkt
-- MOAT: 15 pkt (`Unknown` daje 3 pkt)
-- Valuation, preferowane PEG albo fallback P/E: 10 pkt
-- Debt management: 10 pkt, preferuje Net Debt/EBITDA, fallback Debt/Equity
-- Analyst consensus: 5 pkt
+- Gross margin: 10 pkt
+- Revenue growth + FCF margin: 10 pkt
+- Debt + manual customer/contract dependence: 15 pkt
+- MOAT / competitiveness: 10 pkt (`Unknown` daje 0 pkt)
+- Valuation, Forward P/E vs P/E: 5 pkt
+- Manual Smart Money & Insiders: 15 pkt
+- Manual New Contracts / AI / Backlog: 10 pkt
+- Manual Buybacks: 5 pkt
 
 Kazdy czynnik daje maksymalnie tyle punktow, ile wynosi jego waga. Brakujace
-metryki od providera daja 30% swojej maksymalnej wagi, zeby score nie karal
-zbyt mocno za niekompletne dane Yahoo, ale nadal byl konserwatywny.
+metryki od providera oraz nieuzupelnione pola manualne daja 0 pkt. Jesli nie ma
+zadnych danych scoringowych, score jest `null`.
 
-Red flags odejmuja punkty po score bazowym: kara za dlug tylko gdy
-Debt/Equity > 2 i Net Debt/EBITDA > 3 jednoczesnie; osobno ujemny FCF przez
-2 ostatnie lata. Tabela pokazuje tez krotki kontekst sektorowy: roznice
-score'u wzgledem sredniej spolek z tego samego sektora w watchliscie.
+Red flags sa nadal liczone i pokazywane jako kontekst UI, ale nie odejmuja juz
+punktow od score bazowego. Tabela pokazuje tez krotki kontekst sektorowy:
+roznice score'u wzgledem sredniej spolek z tego samego sektora w watchliscie.

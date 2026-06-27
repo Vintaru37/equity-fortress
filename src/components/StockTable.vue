@@ -35,32 +35,36 @@ const showColumnDialog = ref(false);
 const selectedTicker = ref<string | null>(null);
 const draggedColumnId = ref<string | null>(null);
 const dragOrderChanged = ref(false);
-const COLUMN_PREFS_KEY = "equity-fortress:table-columns";
+const COLUMN_PREFS_KEY = "equity-fortress:table-columns:v3";
 
 const defaultColumnOrder = [
   "ticker",
   "actions",
   "company",
+  "score",
+  "roce",
+  "grossMargin",
+  "revenueGrowth",
+  "fcfMargin",
+  "netDebtToEbitda",
+  "debtToEquity",
+  "customerDependenceScore",
+  "moat",
+  "pe",
+  "forwardPe",
+  "smartMoneyScore",
+  "backlogScore",
+  "buybacksScore",
   "oneYearChart",
   "performance1W",
   "performance1Y",
   "performance3Y",
   "performance5Y",
   "analystConsensus",
-  "grossMargin",
   "operatingMargin",
-  "roce",
-  "fcfMargin",
-  "pe",
-  "forwardPe",
   "peg",
-  "netDebtToEbitda",
-  "revenueGrowth",
   "epsGrowth",
-  "debtToEquity",
   "beta",
-  "moat",
-  "score",
   "notes",
 ] as const;
 
@@ -74,6 +78,26 @@ interface ColumnPrefs {
 }
 
 const defaultColumnIdSet = new Set<string>(defaultColumnOrder);
+const defaultVisibleColumnIds = new Set<string>([
+  "ticker",
+  "actions",
+  "company",
+  "score",
+  "roce",
+  "grossMargin",
+  "revenueGrowth",
+  "fcfMargin",
+  "netDebtToEbitda",
+  "debtToEquity",
+  "customerDependenceScore",
+  "moat",
+  "pe",
+  "forwardPe",
+  "smartMoneyScore",
+  "backlogScore",
+  "buybacksScore",
+  "notes",
+]);
 
 const columnDescriptions: Record<ColumnId, string> = {
   ticker: "Stock symbol and latest market price.",
@@ -86,27 +110,35 @@ const columnDescriptions: Record<ColumnId, string> = {
   performance5Y: "Price return over roughly the last 5 years.",
   analystConsensus: "Yahoo analyst recommendation: buy, hold, or sell.",
   grossMargin:
-    "How much revenue remains after direct production costs. Higher margins usually mean more room to absorb cost shocks or pricing pressure.\n\nGross margin = Gross profit / Revenue",
+    "Fundamentals, 0-10 score input. Shows product strength and margin cushion.\n\nGross margin = Gross profit / Revenue",
   operatingMargin:
-    "How much revenue remains after normal operating costs. It shows how efficiently the core business turns sales into operating profit.\n\nOperating margin = Operating income / Revenue",
-  roce: "How effectively the company uses the capital tied up in the business. High ROCE suggests management can turn invested capital into operating profit.\n\nROCE = EBIT / (Total assets - Current liabilities)",
+    "How much revenue remains after normal operating costs. Hidden by default because the current scoring system does not weight it directly.\n\nOperating margin = Operating income / Revenue",
+  roce: "Fundamentals, 0-20 score input. Measures how effectively the company turns invested capital into operating profit.\n\nROCE = EBIT / (Total assets - Current liabilities)",
   fcfMargin:
-    "How much revenue becomes free cash flow after operating needs and capital spending. It points to cash generation quality, not just accounting profit.\n\nFCF margin = Free cash flow / Revenue",
-  pe: "How much investors pay for each dollar of trailing earnings. Lower can mean cheaper, but only if earnings are durable.\n\nP/E = Share price / Trailing EPS",
+    "Fundamentals, part of the 0-10 Revenue Growth & FCF score. Shows cash generation quality.\n\nFCF margin = Free cash flow / Revenue",
+  pe: "Catalysts & Valuation, part of the 0-5 valuation score when compared with Forward P/E.\n\nP/E = Share price / Trailing EPS",
   forwardPe:
-    "How much investors pay for each expected dollar of next-year earnings. It is more forward-looking, but depends on analyst estimates.\n\nForward P/E = Share price / Estimated next-year EPS",
-  peg: "Valuation adjusted for earnings growth. It asks whether the P/E is justified by expected or observed EPS growth.\n\nPEG = P/E / EPS growth rate",
+    "Catalysts & Valuation, part of the 0-5 valuation score. A meaningfully lower Forward P/E versus P/E signals expected earnings growth.\n\nForward P/E = Share price / Estimated next-year EPS",
+  peg: "Valuation adjusted for earnings growth. Hidden by default because the current scoring system uses Forward P/E versus P/E.\n\nPEG = P/E / EPS growth rate",
   netDebtToEbitda:
-    "How many years of EBITDA would be needed to repay net debt. Lower values usually mean safer debt management.\n\nNet Debt/EBITDA = (Total debt - Cash) / EBITDA",
+    "Risks, auto debt input for the 0-15 Debt & Dependence score. Lower values usually mean safer debt management.\n\nNet Debt/EBITDA = (Total debt - Cash) / EBITDA",
   revenueGrowth:
-    "How quickly sales are expanding versus the prior year. It shows demand and business scale before margin effects.\n\nRevenue growth = (Current revenue - Prior revenue) / Prior revenue",
+    "Fundamentals, part of the 0-10 Revenue Growth & FCF score. Shows demand and business scale before margin effects.\n\nRevenue growth = (Current revenue - Prior revenue) / Prior revenue",
   epsGrowth:
-    "How quickly earnings per share are growing versus the prior year. It captures profit growth after costs, taxes, and share-count effects.\n\nEPS growth = (Current EPS - Prior EPS) / Prior EPS",
+    "How quickly earnings per share are growing versus the prior year. Hidden by default because the current scoring system does not weight it directly.\n\nEPS growth = (Current EPS - Prior EPS) / Prior EPS",
   debtToEquity:
-    "How much debt financing the company uses compared with shareholder capital. Higher values usually mean more leverage and balance-sheet risk.\n\nDebt/Equity = Total debt / Shareholders' equity",
+    "Risks, fallback debt input for the 0-15 Debt & Dependence score. Higher values usually mean more leverage risk.\n\nDebt/Equity = Total debt / Shareholders' equity",
+  customerDependenceScore:
+    "Manual 0-5 input inside the 0-15 Debt & Dependence score. Higher means lower dependence on one customer, contract, lender, or rate-sensitive funding.",
   beta: "How volatile the stock has been compared with the market. A beta above 1 tends to move more than the market; below 1 tends to move less.\n\nBeta = Covariance(stock returns, market returns) / Variance(market returns)",
-  moat: "Your qualitative competitive-advantage rating.",
-  score: "0-100 weighted quality score calculated by Equity Fortress.",
+  moat: "Risks, 0-10 competitiveness score input based on your qualitative competitive-advantage rating.",
+  score: "0-100 score using Fundamentals, Risks, and Catalysts & Valuation.",
+  smartMoneyScore:
+    "Manual 0-15 Catalysts & Valuation input for politicians, governments, institutions, insiders, and Wall Street activity.",
+  backlogScore:
+    "Manual 0-10 Catalysts & Valuation input for new contracts, AI exposure, partnerships, and backlog.",
+  buybacksScore:
+    "Manual 0-5 Catalysts & Valuation input for active share repurchases and share-count pressure.",
   notes:
     "Your own qualitative notes and reminders for the position.\n\nStored locally with the dashboard watchlist.",
 };
@@ -140,9 +172,13 @@ const columns: ColumnDef<StockRowData>[] = [
   { accessorKey: "revenueGrowth", header: "Rev Growth" },
   { accessorKey: "epsGrowth", header: "EPS Growth" },
   { accessorKey: "debtToEquity", header: "D/E" },
+  { accessorKey: "customerDependenceScore", header: "Dependence" },
   { accessorKey: "beta", header: "Beta" },
   { accessorKey: "moat", header: "MOAT" },
   { accessorKey: "score", header: "Score" },
+  { accessorKey: "smartMoneyScore", header: "Smart $" },
+  { accessorKey: "backlogScore", header: "AI/Backlog" },
+  { accessorKey: "buybacksScore", header: "Buybacks" },
   { accessorKey: "notes", header: "Notes" },
 ];
 
@@ -152,8 +188,12 @@ const columnWidthClasses: Record<string, string> = {
   company: "w-72 min-w-72",
   oneYearChart: "w-48 min-w-48",
   analystConsensus: "w-28 min-w-28",
+  customerDependenceScore: "w-32 min-w-32",
   moat: "w-36 min-w-36",
   score: "w-28 min-w-28",
+  smartMoneyScore: "w-32 min-w-32",
+  backlogScore: "w-32 min-w-32",
+  buybacksScore: "w-32 min-w-32",
   notes: "w-72 min-w-72",
 };
 
@@ -174,7 +214,7 @@ function readColumnPrefs(): ColumnPrefs {
   } catch (_error) {
     return {
       order: [...defaultColumnOrder],
-      visibility: {},
+      visibility: defaultColumnVisibility(),
       rowDensity: "default",
     };
   }
@@ -197,14 +237,27 @@ function normalizeColumnOrder(value: unknown): ColumnOrderState {
 
 function normalizeColumnVisibility(value: unknown): VisibilityState {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
+    return defaultColumnVisibility();
   }
 
-  return Object.fromEntries(
+  const saved = Object.fromEntries(
     Object.entries(value).filter(
       ([columnId, visible]) =>
         defaultColumnIdSet.has(columnId) && typeof visible === "boolean",
     ),
+  );
+
+  return {
+    ...defaultColumnVisibility(),
+    ...saved,
+  };
+}
+
+function defaultColumnVisibility(): VisibilityState {
+  return Object.fromEntries(
+    defaultColumnOrder
+      .filter((columnId) => !defaultVisibleColumnIds.has(columnId))
+      .map((columnId) => [columnId, false]),
   );
 }
 
@@ -381,7 +434,7 @@ function columnPosition(columnId: string): number {
 
 function resetColumns(): void {
   columnOrder.value = pinTickerFirst([...defaultColumnOrder]);
-  columnVisibility.value = {};
+  columnVisibility.value = defaultColumnVisibility();
   rowDensity.value = "default";
   persistColumnPrefs();
 }
@@ -641,7 +694,7 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
       class="table-scroll max-h-[calc(100vh-180px)] min-h-[800px] overflow-x-scroll overflow-y-auto"
     >
       <table
-        class="w-max min-w-[2500px] border-separate border-spacing-0"
+        class="w-max min-w-full border-separate border-spacing-0"
         :class="tableDensityClass()"
       >
         <thead>
@@ -698,6 +751,7 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
             @refresh="store.refreshStock"
             @remove="store.removeTicker"
             @update-moat="store.updateMoat"
+            @update-manual-score="store.updateManualScore"
             @update-notes="store.updateNotes"
           />
         </tbody>

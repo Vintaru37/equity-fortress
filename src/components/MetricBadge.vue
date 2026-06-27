@@ -113,7 +113,7 @@ const tone = computed(() => {
 
   if (props.kind === "score") {
     if (value >= 75) return tones.positive;
-    if (value >= 50) return tones.warning;
+    if (value >= 60) return tones.warning;
     return tones.negative;
   }
 

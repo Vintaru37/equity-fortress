@@ -11,9 +11,11 @@ import {
   normalizeTickerInput,
 } from "@/utils/formatters";
 import { calculateScore } from "@/utils/score";
-import { MOAT_OPTIONS } from "@/types/stock";
+import { MANUAL_SCORE_LIMITS, MOAT_OPTIONS } from "@/types/stock";
 import type {
   ChartPoint,
+  ManualScoreKey,
+  ManualScores,
   Moat,
   PersistedStocksState,
   Portfolio,
@@ -105,6 +107,10 @@ interface WatchlistStockRow {
   company: string | null;
   moat: string;
   notes: string | null;
+  customer_dependence_score: number | null;
+  smart_money_score: number | null;
+  backlog_score: number | null;
+  buybacks_score: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -119,6 +125,15 @@ interface StockResearchUpdate {
   ticker: string;
   moat?: Moat;
   notes?: string;
+}
+
+interface WatchlistPatch {
+  moat?: Moat;
+  notes?: string;
+  customer_dependence_score?: number | null;
+  smart_money_score?: number | null;
+  backlog_score?: number | null;
+  buybacks_score?: number | null;
 }
 
 function normalizeMoat(value: unknown): Moat {
@@ -137,6 +152,99 @@ function normalizeMoat(value: unknown): Moat {
   if (value === "None") return "Bad";
   if (value === "Very Bad") return "Very Bad";
   return "Unknown";
+}
+
+function emptyManualScores(): ManualScores {
+  return {
+    customerDependenceScore: null,
+    smartMoneyScore: null,
+    backlogScore: null,
+    buybacksScore: null,
+  };
+}
+
+function normalizeManualScore(
+  key: ManualScoreKey,
+  value: unknown,
+): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(MANUAL_SCORE_LIMITS[key], Math.round(numericValue)));
+}
+
+function normalizeManualScores(value: unknown): ManualScores {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyManualScores();
+  }
+
+  const input = value as Partial<Record<ManualScoreKey, unknown>>;
+  return {
+    customerDependenceScore: normalizeManualScore(
+      "customerDependenceScore",
+      input.customerDependenceScore,
+    ),
+    smartMoneyScore: normalizeManualScore(
+      "smartMoneyScore",
+      input.smartMoneyScore,
+    ),
+    backlogScore: normalizeManualScore("backlogScore", input.backlogScore),
+    buybacksScore: normalizeManualScore("buybacksScore", input.buybacksScore),
+  };
+}
+
+function manualScoresFromWatchlistRow(row: WatchlistStockRow): ManualScores {
+  return {
+    customerDependenceScore: normalizeManualScore(
+      "customerDependenceScore",
+      row.customer_dependence_score,
+    ),
+    smartMoneyScore: normalizeManualScore("smartMoneyScore", row.smart_money_score),
+    backlogScore: normalizeManualScore("backlogScore", row.backlog_score),
+    buybacksScore: normalizeManualScore("buybacksScore", row.buybacks_score),
+  };
+}
+
+function pickManualScores(stock: Partial<ManualScores>): ManualScores {
+  return normalizeManualScores(stock);
+}
+
+function manualScorePatch(
+  key: ManualScoreKey,
+  value: number | null,
+): WatchlistPatch {
+  switch (key) {
+    case "customerDependenceScore":
+      return { customer_dependence_score: value };
+    case "smartMoneyScore":
+      return { smart_money_score: value };
+    case "backlogScore":
+      return { backlog_score: value };
+    case "buybacksScore":
+      return { buybacks_score: value };
+  }
+}
+
+function watchlistManualScoreColumns(stock: Partial<ManualScores>): {
+  customer_dependence_score: number | null;
+  smart_money_score: number | null;
+  backlog_score: number | null;
+  buybacks_score: number | null;
+} {
+  const scores = pickManualScores(stock);
+
+  return {
+    customer_dependence_score: scores.customerDependenceScore,
+    smart_money_score: scores.smartMoneyScore,
+    backlog_score: scores.backlogScore,
+    buybacks_score: scores.buybacksScore,
+  };
 }
 
 function edgeFunctionUrl(name: string): string {
@@ -159,6 +267,7 @@ function readPersistedState(): PersistedStocksState {
     tickers: DEFAULT_PORTFOLIO_TICKERS,
     notes: {},
     moats: {},
+    manualScores: {},
   };
 
   const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -183,6 +292,16 @@ function readPersistedState(): PersistedStocksState {
         normalizeMoat(moat),
       ]),
     );
+    const rawManualScores =
+      parsed.manualScores && typeof parsed.manualScores === "object"
+        ? parsed.manualScores
+        : {};
+    const manualScores = Object.fromEntries(
+      Object.entries(rawManualScores).map(([ticker, scores]) => [
+        ticker,
+        normalizeManualScores(scores),
+      ]),
+    );
 
     return {
       tickers: tickers.length > 0
@@ -190,6 +309,7 @@ function readPersistedState(): PersistedStocksState {
         : DEFAULT_PORTFOLIO_TICKERS,
       notes: parsed.notes && typeof parsed.notes === "object" ? parsed.notes : {},
       moats,
+      manualScores,
     };
   } catch (_error) {
     return fallback;
@@ -199,6 +319,7 @@ function readPersistedState(): PersistedStocksState {
 function emptyStock(ticker: string, moat: Moat = "Unknown"): StockData {
   return {
     ticker,
+    ...emptyManualScores(),
     company: null,
     currentPrice: null,
     oneYearChart: [],
@@ -257,6 +378,7 @@ function stockFromWatchlistRow(row: WatchlistStockRow): StockRowData {
 
   return {
     ...emptyStock(ticker, normalizeMoat(row.moat)),
+    ...manualScoresFromWatchlistRow(row),
     watchlistId: row.id,
     company: row.company,
     notes: row.notes ?? "",
@@ -273,6 +395,7 @@ function stockFromPersistedState(
 ): StockRowData {
   return {
     ...emptyStock(ticker, persisted.moats[ticker] ?? "Unknown"),
+    ...normalizeManualScores(persisted.manualScores[ticker]),
     watchlistId: null,
     notes: persisted.notes[ticker] ?? "",
     isRefreshing: false,
@@ -445,6 +568,9 @@ export const useStocksStore = defineStore("stocks", () => {
       moats: Object.fromEntries(
         stocks.value.map((stock) => [stock.ticker, stock.moat]),
       ),
+      manualScores: Object.fromEntries(
+        stocks.value.map((stock) => [stock.ticker, pickManualScores(stock)]),
+      ),
     };
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -527,8 +653,12 @@ export const useStocksStore = defineStore("stocks", () => {
     const index = stocks.value.findIndex((item) => item.ticker === stock.ticker);
     const existing = index >= 0 ? stocks.value[index] : null;
     const moat = existing?.moat ?? stock.moat;
+    const manualScores = existing
+      ? pickManualScores(existing)
+      : pickManualScores(stock);
     const scoreInput: StockData = {
       ...stock,
+      ...manualScores,
       moat,
       redFlags: stock.redFlags ?? [],
       scorePenalty: stock.scorePenalty ?? 0,
@@ -1199,6 +1329,31 @@ export const useStocksStore = defineStore("stocks", () => {
     void persistWatchlistPatch(ticker, { notes });
   }
 
+  function updateManualScore(
+    ticker: string,
+    key: ManualScoreKey,
+    value: number | null,
+  ): void {
+    const stock = stocks.value.find((item) => item.ticker === ticker);
+    if (!stock) {
+      return;
+    }
+
+    const nextValue = normalizeManualScore(key, value);
+    stocks.value = stocks.value.map((item) => {
+      if (item.ticker !== ticker) {
+        return item;
+      }
+
+      const next = { ...item, [key]: nextValue };
+      return { ...next, score: calculateScore(next) };
+    });
+    recomputeSectorComparisons();
+    persistLocalState();
+    cacheActivePortfolio();
+    void persistWatchlistPatch(ticker, manualScorePatch(key, nextValue));
+  }
+
   async function clearAllNotes(): Promise<void> {
     const updates = stocks.value
       .filter((stock) => stock.notes.trim() !== "")
@@ -1254,7 +1409,7 @@ export const useStocksStore = defineStore("stocks", () => {
 
   async function persistWatchlistPatch(
     ticker: string,
-    patch: { moat?: Moat; notes?: string },
+    patch: WatchlistPatch,
   ): Promise<void> {
     if (!auth.isAuthenticated) {
       return;
@@ -1308,6 +1463,7 @@ export const useStocksStore = defineStore("stocks", () => {
           company: stock.company,
           moat: patch.moat ?? stock.moat,
           notes: patch.notes ?? stock.notes,
+          ...watchlistManualScoreColumns(stock),
         };
       })
       .filter((row): row is {
@@ -1318,6 +1474,10 @@ export const useStocksStore = defineStore("stocks", () => {
         company: string | null;
         moat: Moat;
         notes: string;
+        customer_dependence_score: number | null;
+        smart_money_score: number | null;
+        backlog_score: number | null;
+        buybacks_score: number | null;
       } => row !== null);
 
     if (rows.length === 0) {
@@ -1373,6 +1533,7 @@ export const useStocksStore = defineStore("stocks", () => {
     addTicker,
     removeTicker,
     updateMoat,
+    updateManualScore,
     updateNotes,
     clearAllNotes,
     applyResearchUpdates,

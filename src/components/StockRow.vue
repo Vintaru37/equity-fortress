@@ -5,10 +5,12 @@ import { Trash2 } from "@lucide/vue";
 import AppTooltip from "@/components/AppTooltip.vue";
 import MetricBadge from "@/components/MetricBadge.vue";
 import MoatSelect from "@/components/MoatSelect.vue";
+import PointSelect from "@/components/PointSelect.vue";
 import RefreshButton from "@/components/RefreshButton.vue";
 import SparklineChart from "@/components/SparklineChart.vue";
 import StockNotes from "@/components/StockNotes.vue";
-import type { Moat, StockRowData } from "@/types/stock";
+import { MANUAL_SCORE_LIMITS } from "@/types/stock";
+import type { ManualScoreKey, Moat, StockRowData } from "@/types/stock";
 import {
   analystTone,
   formatNumber,
@@ -27,6 +29,11 @@ const emit = defineEmits<{
   refresh: [ticker: string];
   remove: [ticker: string];
   updateMoat: [ticker: string, moat: Moat];
+  updateManualScore: [
+    ticker: string,
+    key: ManualScoreKey,
+    value: number | null,
+  ];
   updateNotes: [ticker: string, notes: string];
 }>();
 
@@ -44,6 +51,10 @@ function remove(): void {
 
 function updateMoat(moat: Moat): void {
   emit("updateMoat", props.row.original.ticker, moat);
+}
+
+function updateManualScore(key: ManualScoreKey, value: number | null): void {
+  emit("updateManualScore", props.row.original.ticker, key, value);
 }
 
 function updateNotes(notes: string): void {
@@ -188,6 +199,19 @@ function hasScoreDetails(stock: StockRowData): boolean {
       <td v-else-if="columnId === 'debtToEquity'" class="table-cell numeric-cell w-28 min-w-28">
         <MetricBadge :value="row.original.debtToEquity" kind="debt" :decimals="2" />
       </td>
+      <td
+        v-else-if="columnId === 'customerDependenceScore'"
+        class="table-cell w-32 min-w-32"
+        @click.stop
+        @keydown.stop
+      >
+        <PointSelect
+          :model-value="row.original.customerDependenceScore"
+          :max="MANUAL_SCORE_LIMITS.customerDependenceScore"
+          :label="`Customer dependence score for ${row.original.ticker}`"
+          @update:model-value="(value) => updateManualScore('customerDependenceScore', value)"
+        />
+      </td>
       <td v-else-if="columnId === 'beta'" class="table-cell numeric-cell w-28 min-w-28">
         <MetricBadge :value="row.original.beta" kind="beta" :decimals="2" />
       </td>
@@ -227,6 +251,48 @@ function hasScoreDetails(stock: StockRowData): boolean {
             </div>
           </AppTooltip>
         </div>
+      </td>
+
+      <td
+        v-else-if="columnId === 'smartMoneyScore'"
+        class="table-cell w-32 min-w-32"
+        @click.stop
+        @keydown.stop
+      >
+        <PointSelect
+          :model-value="row.original.smartMoneyScore"
+          :max="MANUAL_SCORE_LIMITS.smartMoneyScore"
+          :label="`Smart Money and insiders score for ${row.original.ticker}`"
+          @update:model-value="(value) => updateManualScore('smartMoneyScore', value)"
+        />
+      </td>
+
+      <td
+        v-else-if="columnId === 'backlogScore'"
+        class="table-cell w-32 min-w-32"
+        @click.stop
+        @keydown.stop
+      >
+        <PointSelect
+          :model-value="row.original.backlogScore"
+          :max="MANUAL_SCORE_LIMITS.backlogScore"
+          :label="`New contracts AI backlog score for ${row.original.ticker}`"
+          @update:model-value="(value) => updateManualScore('backlogScore', value)"
+        />
+      </td>
+
+      <td
+        v-else-if="columnId === 'buybacksScore'"
+        class="table-cell w-32 min-w-32"
+        @click.stop
+        @keydown.stop
+      >
+        <PointSelect
+          :model-value="row.original.buybacksScore"
+          :max="MANUAL_SCORE_LIMITS.buybacksScore"
+          :label="`Buybacks score for ${row.original.ticker}`"
+          @update:model-value="(value) => updateManualScore('buybacksScore', value)"
+        />
       </td>
 
       <td

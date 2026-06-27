@@ -7,13 +7,29 @@ export type Moat =
   | "Very Bad"
   | "Unknown";
 
+export interface ManualScores {
+  customerDependenceScore: number | null;
+  smartMoneyScore: number | null;
+  backlogScore: number | null;
+  buybacksScore: number | null;
+}
+
+export const MANUAL_SCORE_LIMITS = {
+  customerDependenceScore: 5,
+  smartMoneyScore: 15,
+  backlogScore: 10,
+  buybacksScore: 5,
+} as const;
+
+export type ManualScoreKey = keyof typeof MANUAL_SCORE_LIMITS;
+
 export interface ChartPoint {
   date: string;
   close: number;
   volume?: number;
 }
 
-export interface StockData {
+export interface StockData extends ManualScores {
   ticker: string;
   company: string | null;
   currentPrice: number | null;
@@ -71,6 +87,7 @@ export interface PersistedStocksState {
   tickers: string[];
   notes: Record<string, string>;
   moats: Record<string, Moat>;
+  manualScores: Record<string, Partial<ManualScores>>;
 }
 
 export const MOAT_OPTIONS: Moat[] = [

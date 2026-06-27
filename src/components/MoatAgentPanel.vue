@@ -53,16 +53,16 @@ const appliedTickers = ref<string[]>([]);
 const promptCopied = ref(false);
 
 const candidateStocks = computed(() =>
-  scope.value === "filtered" ? store.filteredStocks : store.stocks
+  scope.value === "filtered" ? store.filteredStocks : store.stocks,
 );
 const researchStocks = computed(() =>
-  candidateStocks.value.slice(0, maxTickers.value)
+  candidateStocks.value.slice(0, maxTickers.value),
 );
 const successfulResults = computed(() =>
-  results.value.filter((result) => result.status !== "error")
+  results.value.filter((result) => result.status !== "error"),
 );
-const canResearch = computed(() =>
-  !loading.value && researchStocks.value.length > 0
+const canResearch = computed(
+  () => !loading.value && researchStocks.value.length > 0,
 );
 
 function openPanel(): void {
@@ -113,11 +113,12 @@ async function runResearch(): Promise<void> {
     researchedAt.value = response.researchedAt;
     void refreshHealth();
   } catch (requestError) {
-    error.value = requestError instanceof DOMException && requestError.name === "AbortError"
-      ? "Moat research timed out. Try a smaller limit or restart the local agent."
-      : requestError instanceof Error
-        ? requestError.message
-        : "Moat research failed";
+    error.value =
+      requestError instanceof DOMException && requestError.name === "AbortError"
+        ? "Moat research timed out. Try a smaller limit or restart the local agent."
+        : requestError instanceof Error
+          ? requestError.message
+          : "Moat research failed";
   } finally {
     loading.value = false;
   }
@@ -138,47 +139,36 @@ async function copyPortfolioPrompt(): Promise<void> {
 }
 
 function buildPortfolioMoatPrompt(): string {
-  const stockLines = store.stocks
-    .slice()
-    .sort((left, right) => {
-      const leftScore = left.score ?? -1;
-      const rightScore = right.score ?? -1;
-      return rightScore - leftScore || left.ticker.localeCompare(right.ticker);
-    })
-    .map((stock) => {
-      const company = stock.company ?? "Company unknown";
-      const notes = stock.notes.trim()
-        ? ` | current notes: ${clipPromptText(stock.notes, 180)}`
-        : "";
-
-      const score = stock.score === null ? "N/A" : String(stock.score);
-      return `- ${stock.ticker} | ${company} | score: ${score} | current app moat: ${stock.moat}${notes}`;
-    })
-    .join("\n");
+  const stockNames = store.filteredStocks
+    .map((stock) =>
+      stock.company ? `${stock.company} (${stock.ticker})` : stock.ticker,
+    )
+    .join(", ");
 
   return [
-    "Research the economic moat for every stock below. Use recent sources where possible, especially latest annual reports, quarterly reports, earnings calls, investor relations pages, and reputable recent articles.",
-    "",
-    "Use exactly one moat rating per stock from this app scale: Very Bad, Bad, Average, Good, Very Good, Excellent, Unknown.",
-    "Be conservative: Excellent should be rare, Very Good should require strong durable evidence, and normal competitive-risk language should not automatically mean Bad.",
-    "",
-    "For every stock, return:",
-    "Ticker | Company | Moat rating | 3-4 very short notes",
-    "",
-    "Keep the notes human, specific, and short. Do not skip any stock.",
-    "",
-    "Portfolio stocks:",
-    stockLines || "- No stocks found",
+    `Przeprowadź analizę punktową dla spółek: ${stockNames || "brak spółek"}, ściśle według poniższego systemu oceny (1-100 pkt) dla danych z obecnego roku.`,
+    "1. Fundamentals (0-40 pkt):",
+    "•\tROCE (Cel: >15-20%): 0-20 pkt.",
+    "•\tMarża Brutto (Cel: >40%): 0-10 pkt.",
+    "•\tWzrost Przychodów & FCF: 0-10 pkt.",
+    "2. Risks (0-25 pkt):",
+    "•\tZadłużenie & Zależność (Net Debt/EBITDA, koncentracja klientów): 0-15 pkt.",
+    "•\tKonkurencyjność (Moat): 0-10 pkt.",
+    "3. Catalysts & Valuation (0-35 pkt):",
+    "•\tWycena (Forward P/E vs P/E): 0-5 pkt.",
+    "•\tSmart Money & Insiders (politycy, rządy, instytucje, wall street): 0-15 pkt.",
+    "•\tNowe Kontrakty/AI/Backlog: 0-10 pkt.",
+    "•\tBuybacks: 0-5 pkt.",
+    "WYMAGANIA DOTYCZĄCE ODPOWIEDZI:",
+    "1.\tPrzedstaw wyniki w formie tabeli, gdzie wiersze to spółki, a kolumny to poszczególne kryteria z przypisaną punktacją.",
+    "2.\tPod tabelą dodaj sekcję 'Werdykt i Strategia', w której dla każdej spółki:",
+    "o\tPodasz łączną sumę punktów.",
+    "o\tPrzypiszesz kategorię (90-100: Unicorn/Silne Kupuj (Okazja dekady) | 75-89: Smart Money Play/Kupuj | 60-74: Trzymaj/Akumuluj | <60: Unikaj).",
+    "o\tOkreślisz konkretną metodę wejścia: Jednorazowo (Lump Sum) czy DCA (Akumulacja), uzasadniając wybór w jednym zdaniu (np. wejście pod szybki katalizator vs budowanie pozycji na korektach).",
+    "3.\tDodaj drugą tabelę 'Wartości do aplikacji', gdzie wiersze to spółki, a kolumny to: Dependence/Zależność (0-5), Moat/Konkurencyjność (0-10), Smart Money (0-15), AI/Backlog (0-10), Buybacks (0-5), Czy długoterminowa? (Tak/Nie: 5-10 lat+ vs spekulacja pod katalizator) oraz krótkie uzasadnienie.",
+    "4.\tDodaj sekcję, w której jednoznacznie ocenisz czy spółka jest bezpieczną inwestycją długoterminową (5-10 lat+), czy jedynie spekulacyjnym zagraniem pod katalizator.",
+    "5.\tUwzględnij najświeższe dane z obecnego roku, w tym aktywność Smart Money (np. Pelosi, fundusze rządowe, instytucje, Wall Street).",
   ].join("\n");
-}
-
-function clipPromptText(value: string, maxLength: number): string {
-  const cleaned = value.replace(/\s+/g, " ").trim();
-  if (cleaned.length <= maxLength) {
-    return cleaned;
-  }
-
-  return `${cleaned.slice(0, maxLength - 3).trim()}...`;
 }
 
 function stockToAgentInput(stock: StockRowData): MoatAgentStockInput {
@@ -202,13 +192,16 @@ async function applyResult(result: MoatAgentResult): Promise<void> {
   saving.value = true;
 
   try {
-    await store.applyResearchUpdates([{
-      ticker: result.ticker,
-      notes: note,
-      moat: isMoat(result.moat) && result.moat !== "Unknown"
-        ? result.moat
-        : current.moat,
-    }]);
+    await store.applyResearchUpdates([
+      {
+        ticker: result.ticker,
+        notes: note,
+        moat:
+          isMoat(result.moat) && result.moat !== "Unknown"
+            ? result.moat
+            : current.moat,
+      },
+    ]);
 
     if (!appliedTickers.value.includes(result.ticker)) {
       appliedTickers.value = [...appliedTickers.value, result.ticker];
@@ -222,7 +215,9 @@ async function applyAll(): Promise<void> {
   const updates = successfulResults.value
     .filter((result) => !isApplied(result.ticker))
     .map((result) => {
-      const current = store.stocks.find((stock) => stock.ticker === result.ticker);
+      const current = store.stocks.find(
+        (stock) => stock.ticker === result.ticker,
+      );
       if (!current) {
         return null;
       }
@@ -230,16 +225,21 @@ async function applyAll(): Promise<void> {
       return {
         ticker: result.ticker,
         notes: mergeNotes(current.notes, composeResearchNote(result)),
-        moat: isMoat(result.moat) && result.moat !== "Unknown"
-          ? result.moat
-          : current.moat,
+        moat:
+          isMoat(result.moat) && result.moat !== "Unknown"
+            ? result.moat
+            : current.moat,
       };
     })
-    .filter((update): update is {
-      ticker: string;
-      notes: string;
-      moat: Moat;
-    } => update !== null);
+    .filter(
+      (
+        update,
+      ): update is {
+        ticker: string;
+        notes: string;
+        moat: Moat;
+      } => update !== null,
+    );
 
   if (updates.length === 0) {
     return;
@@ -249,10 +249,12 @@ async function applyAll(): Promise<void> {
 
   try {
     await store.applyResearchUpdates(updates);
-    appliedTickers.value = Array.from(new Set([
-      ...appliedTickers.value,
-      ...updates.map((update) => update.ticker),
-    ]));
+    appliedTickers.value = Array.from(
+      new Set([
+        ...appliedTickers.value,
+        ...updates.map((update) => update.ticker),
+      ]),
+    );
   } finally {
     saving.value = false;
   }
@@ -269,10 +271,14 @@ function composeResearchNote(result: MoatAgentResult): string {
     .map((point) => `- ${stripSourceRefs(point)}`);
   const sourceLines = result.sources
     .slice(0, 2)
-    .map((source, index) => `${index + 1}. ${sourceIconLabel(source)} ${sourceLabel(source)}: ${source.url}`);
-  const riskLine = result.risks.length > 0
-    ? `Watch: ${result.risks.slice(0, 2).join("; ")}.`
-    : "";
+    .map(
+      (source, index) =>
+        `${index + 1}. ${sourceIconLabel(source)} ${sourceLabel(source)}: ${source.url}`,
+    );
+  const riskLine =
+    result.risks.length > 0
+      ? `Watch: ${result.risks.slice(0, 2).join("; ")}.`
+      : "";
 
   return clipNote(
     [
@@ -280,7 +286,9 @@ function composeResearchNote(result: MoatAgentResult): string {
       ...points,
       riskLine,
       sourceLines.length > 0 ? `Sources:\n${sourceLines.join("\n")}` : "",
-    ].filter(Boolean).join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n"),
   );
 }
 
@@ -345,16 +353,35 @@ function statusTone(status: MoatAgentResult["status"]): string {
 </script>
 
 <template>
-  <AppTooltip text="Research moat notes">
-    <button
-      type="button"
-      class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950"
-      aria-label="Research moat notes"
-      @click="openPanel"
-    >
-      <Bot class="h-4 w-4" aria-hidden="true" />
-    </button>
-  </AppTooltip>
+  <div class="flex items-center gap-2">
+    <AppTooltip text="Copy AI scoring prompt for the currently visible stocks">
+      <button
+        type="button"
+        class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-bold text-zinc-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950"
+        :disabled="store.filteredStocks.length === 0"
+        @click="copyPortfolioPrompt"
+      >
+        <Check
+          v-if="promptCopied"
+          class="h-4 w-4 text-emerald-600 dark:text-emerald-300"
+          aria-hidden="true"
+        />
+        <Copy v-else class="h-4 w-4" aria-hidden="true" />
+        {{ promptCopied ? "Copied" : "Prompt" }}
+      </button>
+    </AppTooltip>
+
+    <AppTooltip text="Research moat notes">
+      <button
+        type="button"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950"
+        aria-label="Research moat notes"
+        @click="openPanel"
+      >
+        <Bot class="h-4 w-4" aria-hidden="true" />
+      </button>
+    </AppTooltip>
+  </div>
 
   <Teleport to="body">
     <div
@@ -372,14 +399,19 @@ function statusTone(status: MoatAgentResult["status"]): string {
           class="flex items-center justify-between gap-4 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800"
         >
           <div class="flex min-w-0 items-center gap-2">
-            <Bot class="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-300" aria-hidden="true" />
+            <Bot
+              class="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-300"
+              aria-hidden="true"
+            />
             <h2
               id="moat-agent-title"
               class="truncate text-sm font-bold text-zinc-950 dark:text-zinc-100"
             >
               Moat Agent
             </h2>
-            <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+            <span
+              class="text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+            >
               {{ researchStocks.length }} selected
             </span>
           </div>
@@ -389,15 +421,20 @@ function statusTone(status: MoatAgentResult["status"]): string {
               v-if="healthLoading"
               class="inline-flex items-center gap-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400"
             >
-              <LoaderCircle class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              <LoaderCircle
+                class="h-3.5 w-3.5 animate-spin"
+                aria-hidden="true"
+              />
               Checking
             </span>
             <span
               v-else-if="health"
               class="rounded-md border px-2 py-1 text-xs font-semibold"
-              :class="health.ollama?.ok
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
-                : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200'"
+              :class="
+                health.ollama?.ok
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
+                  : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200'
+              "
             >
               {{ health.ollama?.ok ? "Ollama ready" : "Fallback mode" }}
             </span>
@@ -414,9 +451,13 @@ function statusTone(status: MoatAgentResult["status"]): string {
           </div>
         </header>
 
-        <div class="grid gap-3 border-b border-zinc-200 p-4 dark:border-zinc-800 lg:grid-cols-[minmax(280px,1fr)_auto_auto_auto_auto]">
+        <div
+          class="grid gap-3 border-b border-zinc-200 p-4 dark:border-zinc-800 lg:grid-cols-[minmax(280px,1fr)_auto_auto_auto_auto]"
+        >
           <label class="grid gap-1">
-            <span class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+            <span
+              class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400"
+            >
               Agent URL
             </span>
             <AppTooltip
@@ -433,19 +474,25 @@ function statusTone(status: MoatAgentResult["status"]): string {
           </label>
 
           <div class="grid gap-1">
-            <span class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+            <span
+              class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400"
+            >
               Scope
             </span>
             <AppTooltip
               text="Portfolio researches the active portfolio. Filtered researches only rows matching the search box."
             >
-              <div class="inline-grid h-10 grid-cols-2 rounded-md border border-zinc-300 bg-zinc-100 p-1 dark:border-zinc-700 dark:bg-zinc-900">
+              <div
+                class="inline-grid h-10 grid-cols-2 rounded-md border border-zinc-300 bg-zinc-100 p-1 dark:border-zinc-700 dark:bg-zinc-900"
+              >
                 <button
                   type="button"
                   class="rounded px-3 text-xs font-bold transition"
-                  :class="scope === 'portfolio'
-                    ? 'bg-white text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-white'
-                    : 'text-zinc-500 dark:text-zinc-400'"
+                  :class="
+                    scope === 'portfolio'
+                      ? 'bg-white text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-white'
+                      : 'text-zinc-500 dark:text-zinc-400'
+                  "
                   @click="scope = 'portfolio'"
                 >
                   Portfolio
@@ -453,9 +500,11 @@ function statusTone(status: MoatAgentResult["status"]): string {
                 <button
                   type="button"
                   class="rounded px-3 text-xs font-bold transition"
-                  :class="scope === 'filtered'
-                    ? 'bg-white text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-white'
-                    : 'text-zinc-500 dark:text-zinc-400'"
+                  :class="
+                    scope === 'filtered'
+                      ? 'bg-white text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-white'
+                      : 'text-zinc-500 dark:text-zinc-400'
+                  "
                   @click="scope = 'filtered'"
                 >
                   Filtered
@@ -465,7 +514,9 @@ function statusTone(status: MoatAgentResult["status"]): string {
           </div>
 
           <label class="grid gap-1">
-            <span class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+            <span
+              class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400"
+            >
               News Freshness
             </span>
             <AppTooltip
@@ -483,7 +534,9 @@ function statusTone(status: MoatAgentResult["status"]): string {
           </label>
 
           <label class="grid gap-1">
-            <span class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400">
+            <span
+              class="text-[10px] font-semibold uppercase text-zinc-500 dark:text-zinc-400"
+            >
               Limit
             </span>
             <AppTooltip
@@ -503,46 +556,24 @@ function statusTone(status: MoatAgentResult["status"]): string {
 
           <div class="flex items-end">
             <div class="flex items-center gap-2">
-            <AppTooltip text="Copy a prompt for researching moats for every stock in the active portfolio.">
-              <button
-                type="button"
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-sm font-bold text-zinc-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950"
-                :disabled="store.stocks.length === 0"
-                @click="copyPortfolioPrompt"
+              <AppTooltip
+                text="Starts a local research batch. Nothing is saved until you click Add note or Add all."
               >
-                <Check
-                  v-if="promptCopied"
-                  class="h-4 w-4 text-emerald-600 dark:text-emerald-300"
-                  aria-hidden="true"
-                />
-                <Copy
-                  v-else
-                  class="h-4 w-4"
-                  aria-hidden="true"
-                />
-                {{ promptCopied ? "Copied" : "Prompt" }}
-              </button>
-            </AppTooltip>
-            <AppTooltip text="Starts a local research batch. Nothing is saved until you click Add note or Add all.">
-              <button
-                type="button"
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-cyan-300 bg-cyan-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-700 dark:bg-cyan-700 dark:hover:bg-cyan-600"
-                :disabled="!canResearch"
-                @click="runResearch"
-              >
-                <LoaderCircle
-                  v-if="loading"
-                  class="h-4 w-4 animate-spin"
-                  aria-hidden="true"
-                />
-                <Sparkles
-                  v-else
-                  class="h-4 w-4"
-                  aria-hidden="true"
-                />
-                Research
-              </button>
-            </AppTooltip>
+                <button
+                  type="button"
+                  class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-cyan-300 bg-cyan-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-700 dark:bg-cyan-700 dark:hover:bg-cyan-600"
+                  :disabled="!canResearch"
+                  @click="runResearch"
+                >
+                  <LoaderCircle
+                    v-if="loading"
+                    class="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                  <Sparkles v-else class="h-4 w-4" aria-hidden="true" />
+                  Research
+                </button>
+              </AppTooltip>
             </div>
           </div>
         </div>
@@ -552,7 +583,9 @@ function statusTone(status: MoatAgentResult["status"]): string {
         >
           <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>
-            AI moat research can be incomplete or wrong. Treat ratings and notes as a starting point, check the sources, and do not use them as investment advice.
+            AI moat research can be incomplete or wrong. Treat ratings and notes
+            as a starting point, check the sources, and do not use them as
+            investment advice.
           </span>
         </div>
 
@@ -569,12 +602,15 @@ function statusTone(status: MoatAgentResult["status"]): string {
             v-if="results.length === 0"
             class="flex h-72 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 text-sm font-semibold text-zinc-500 dark:border-zinc-700 dark:text-zinc-400"
           >
-            <span>{{ loading ? "Research running..." : "No research yet" }}</span>
+            <span>{{
+              loading ? "Research running..." : "No research yet"
+            }}</span>
             <span
               v-if="loading"
               class="text-xs font-medium text-zinc-400 dark:text-zinc-500"
             >
-              Smaller batches finish faster. The request will stop if the local agent stalls.
+              Smaller batches finish faster. The request will stop if the local
+              agent stalls.
             </span>
           </div>
 
@@ -587,7 +623,9 @@ function statusTone(status: MoatAgentResult["status"]): string {
               <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-2">
-                    <h3 class="text-base font-black text-zinc-950 dark:text-white">
+                    <h3
+                      class="text-base font-black text-zinc-950 dark:text-white"
+                    >
                       {{ result.ticker }}
                     </h3>
                     <span
@@ -602,11 +640,15 @@ function statusTone(status: MoatAgentResult["status"]): string {
                     >
                       {{ result.confidence }}
                     </span>
-                    <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                    <span
+                      class="text-xs font-semibold text-zinc-500 dark:text-zinc-400"
+                    >
                       {{ formatDateTime(result.researchedAt) }}
                     </span>
                   </div>
-                  <p class="mt-2 text-sm font-medium leading-6 text-zinc-700 dark:text-zinc-200">
+                  <p
+                    class="mt-2 text-sm font-medium leading-6 text-zinc-700 dark:text-zinc-200"
+                  >
                     {{ result.summary }}
                   </p>
                 </div>
@@ -614,7 +656,11 @@ function statusTone(status: MoatAgentResult["status"]): string {
                 <button
                   type="button"
                   class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-zinc-300 bg-white px-3 text-xs font-bold text-zinc-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950"
-                  :disabled="saving || result.status === 'error' || isApplied(result.ticker)"
+                  :disabled="
+                    saving ||
+                    result.status === 'error' ||
+                    isApplied(result.ticker)
+                  "
                   @click="applyResult(result)"
                 >
                   <LoaderCircle
@@ -627,9 +673,13 @@ function statusTone(status: MoatAgentResult["status"]): string {
                 </button>
               </div>
 
-              <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(240px,0.65fr)]">
+              <div
+                class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(240px,0.65fr)]"
+              >
                 <div>
-                  <div class="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400">
+                  <div
+                    class="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400"
+                  >
                     Key notes
                   </div>
                   <div class="mt-2 grid gap-2 md:grid-cols-2">
@@ -645,7 +695,9 @@ function statusTone(status: MoatAgentResult["status"]): string {
 
                 <div class="grid content-start gap-3">
                   <div v-if="result.risks.length > 0">
-                    <div class="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400">
+                    <div
+                      class="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400"
+                    >
                       Watch
                     </div>
                     <div class="mt-2 flex flex-wrap gap-2">
@@ -660,7 +712,9 @@ function statusTone(status: MoatAgentResult["status"]): string {
                   </div>
 
                   <div v-if="result.sources.length > 0">
-                    <div class="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400">
+                    <div
+                      class="text-[10px] font-black uppercase text-zinc-500 dark:text-zinc-400"
+                    >
                       Sources
                     </div>
                     <div class="mt-2 flex flex-wrap gap-2">
@@ -673,10 +727,18 @@ function statusTone(status: MoatAgentResult["status"]): string {
                         rel="noreferrer"
                         :title="source.title"
                       >
-                        <FileText class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <FileText
+                          class="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
                         <span class="truncate">{{ sourceTitle(source) }}</span>
-                        <span class="shrink-0 text-zinc-400">{{ sourceLabel(source) }}</span>
-                        <ExternalLink class="h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden="true" />
+                        <span class="shrink-0 text-zinc-400">{{
+                          sourceLabel(source)
+                        }}</span>
+                        <ExternalLink
+                          class="h-3.5 w-3.5 shrink-0 text-zinc-400"
+                          aria-hidden="true"
+                        />
                       </a>
                     </div>
                   </div>
@@ -692,7 +754,10 @@ function statusTone(status: MoatAgentResult["status"]): string {
                   :key="warning"
                   class="flex items-start gap-1.5"
                 >
-                  <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <AlertTriangle
+                    class="mt-0.5 h-3.5 w-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
                   <span>{{ warning }}</span>
                 </div>
               </div>
@@ -704,7 +769,9 @@ function statusTone(status: MoatAgentResult["status"]): string {
           class="flex items-center justify-between gap-4 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800"
         >
           <div class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-            {{ researchedAt ? `Batch ${formatDateTime(researchedAt)}` : "Ready" }}
+            {{
+              researchedAt ? `Batch ${formatDateTime(researchedAt)}` : "Ready"
+            }}
           </div>
           <button
             type="button"

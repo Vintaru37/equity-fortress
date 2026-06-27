@@ -34,6 +34,15 @@ const MOAT_VALUES: Moat[] = [
   "Unknown",
 ];
 
+const MANUAL_SCORE_LIMITS = {
+  customerDependenceScore: 5,
+  smartMoneyScore: 15,
+  backlogScore: 10,
+  buybacksScore: 5,
+} as const;
+
+type ManualScoreKey = keyof typeof MANUAL_SCORE_LIMITS;
+
 type RefreshScope = "quote" | "full";
 
 interface StockDataOptions {
@@ -339,6 +348,10 @@ export function emptyStockData(
 ): StockData {
   return {
     ticker,
+    customerDependenceScore: null,
+    smartMoneyScore: null,
+    backlogScore: null,
+    buybacksScore: null,
     company: null,
     currentPrice: null,
     oneYearChart: [],
@@ -917,6 +930,10 @@ export function composeStockData(
 
   const stockData: StockData = {
     ticker,
+    customerDependenceScore: null,
+    smartMoneyScore: null,
+    backlogScore: null,
+    buybacksScore: null,
     company:
       firstString(profile, ["companyName", "company", "name"]) ??
       firstString(quote, ["name", "companyName"]),
@@ -956,86 +973,87 @@ export function composeStockData(
 }
 
 export function calculateScore(data: StockData): number | null {
-  const factors: Array<{
-    weight: number;
-    points: number | null;
-    missingCredit?: boolean;
-  }> = [
-    {
-      weight: 20,
-      points: scoreThreshold(data.roce, [
-        [40, 20],
-        [30, 18],
-        [20, 16],
-        [15, 13],
-        [10, 9],
-        [0, 5],
-      ]),
-    },
-    {
-      weight: 7.5,
-      points: scoreThreshold(data.grossMargin, [
-        [70, 7.5],
-        [60, 6],
-        [45, 3.75],
-        [0, 1.5],
-      ]),
-    },
-    {
-      weight: 7.5,
-      points: scoreThreshold(data.operatingMargin, [
-        [35, 7.5],
-        [25, 6],
-        [15, 3.75],
-        [0, 2.25],
-      ]),
-    },
-    {
-      weight: 10,
-      points: scoreThreshold(data.epsGrowth, [
-        [20, 10],
-        [15, 8],
-        [10, 6],
-        [5, 4],
-        [0, 2],
-      ]),
-    },
-    {
-      weight: 10,
-      points: scoreThreshold(data.fcfMargin, [
-        [25, 10],
-        [20, 8],
-        [10, 5],
-        [0, 3],
-      ]),
-    },
-    {
-      weight: 5,
-      points: scoreThreshold(data.revenueGrowth, [
-        [15, 5],
-        [10, 4],
-        [5, 3],
-        [0, 1],
-      ]),
-    },
-    { weight: 15, points: moatScore(data.moat), missingCredit: false },
-    { weight: 10, points: valuationScore(data.peg, data.pe) },
-    { weight: 10, points: debtScore(data.netDebtToEbitda, data.debtToEquity) },
-    { weight: 5, points: analystScore(data.analystConsensus) },
-  ];
-
-  const scoredFactors = factors.filter((factor) => factor.points !== null);
-  if (scoredFactors.length === 0) {
+  if (!hasScoreEvidence(data)) {
     return null;
   }
 
-  const rawScore = factors.reduce((sum, factor) => {
-    const fallback = factor.missingCredit === false ? 0 : factor.weight * 0.3;
-    return sum + (factor.points ?? fallback);
-  }, 0);
-  const score = rawScore - (data.scorePenalty ?? 0);
+  const score =
+    (roceScore(data.roce) ?? 0) +
+    (grossMarginScore(data.grossMargin) ?? 0) +
+    (growthAndFcfScore(data.revenueGrowth, data.fcfMargin) ?? 0) +
+    (debtAndDependenceScore(
+      data.netDebtToEbitda,
+      data.debtToEquity,
+      data.customerDependenceScore,
+    ) ?? 0) +
+    moatScore(data.moat) +
+    (forwardPeValuationScore(data.pe, data.forwardPe) ?? 0) +
+    manualScore("smartMoneyScore", data.smartMoneyScore) +
+    manualScore("backlogScore", data.backlogScore) +
+    manualScore("buybacksScore", data.buybacksScore);
 
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function hasScoreEvidence(data: StockData): boolean {
+  return [
+    data.roce,
+    data.grossMargin,
+    data.revenueGrowth,
+    data.fcfMargin,
+    data.netDebtToEbitda,
+    data.debtToEquity,
+    data.pe,
+    data.forwardPe,
+    data.customerDependenceScore,
+    data.smartMoneyScore,
+    data.backlogScore,
+    data.buybacksScore,
+  ].some((value) => value !== null && value !== undefined) || data.moat !== "Unknown";
+}
+
+function roceScore(value: number | null): number | null {
+  return scoreThreshold(value, [
+    [30, 20],
+    [25, 18],
+    [20, 16],
+    [15, 13],
+    [10, 8],
+    [0, 4],
+  ]);
+}
+
+function grossMarginScore(value: number | null): number | null {
+  return scoreThreshold(value, [
+    [60, 10],
+    [50, 8],
+    [40, 6],
+    [30, 4],
+    [20, 2],
+    [0, 1],
+  ]);
+}
+
+function growthAndFcfScore(
+  revenueGrowth: number | null,
+  fcfMargin: number | null,
+): number | null {
+  const growth = scoreThreshold(revenueGrowth, [
+    [20, 5],
+    [15, 4],
+    [10, 3],
+    [5, 2],
+    [0, 1],
+  ]);
+  const fcf = scoreThreshold(fcfMargin, [
+    [20, 5],
+    [15, 4],
+    [10, 3],
+    [5, 2],
+    [0, 1],
+  ]);
+
+  return growth === null && fcf === null ? null : (growth ?? 0) + (fcf ?? 0);
 }
 
 function scoreThreshold(
@@ -1055,23 +1073,20 @@ function scoreThreshold(
   return 0;
 }
 
-function valuationScore(peg: number | null, pe: number | null): number | null {
-  if (peg != null) {
-    if (peg < 1) return 10;
-    if (peg < 1.5) return 8;
-    if (peg < 2) return 5;
-    if (peg < 3) return 2;
-    return 0;
-  }
+function debtAndDependenceScore(
+  netDebtToEbitda: number | null,
+  debtToEquity: number | null,
+  customerDependenceScore: number | null,
+): number | null {
+  const debt = debtScore(netDebtToEbitda, debtToEquity);
+  const dependence = manualScoreOrNull(
+    "customerDependenceScore",
+    customerDependenceScore,
+  );
 
-  if (pe != null) {
-    if (pe <= 20) return 7;
-    if (pe <= 30) return 5;
-    if (pe <= 40) return 3;
-    return 1;
-  }
-
-  return null;
+  return debt === null && dependence === null
+    ? null
+    : (debt ?? 0) + (dependence ?? 0);
 }
 
 function debtScore(
@@ -1098,36 +1113,53 @@ function debtScore(
   return 0;
 }
 
-function analystScore(consensus: string | null): number | null {
-  if (!consensus) {
+function forwardPeValuationScore(
+  pe: number | null,
+  forwardPe: number | null,
+): number | null {
+  if (pe == null || forwardPe == null || pe <= 0 || forwardPe <= 0) {
     return null;
   }
 
-  const normalized = consensus.toLowerCase();
-  if (normalized.includes("strong buy")) return 5;
-  if (normalized.includes("buy") && !normalized.includes("sell")) return 4;
-  if (normalized.includes("hold") || normalized.includes("neutral")) return 2.5;
-  if (normalized.includes("strong sell")) return 0;
-  if (normalized.includes("sell")) return 1;
-  return null;
+  const ratio = forwardPe / pe;
+  if (ratio <= 0.5) return 5;
+  if (ratio <= 0.65) return 4;
+  if (ratio <= 0.8) return 3;
+  if (ratio <= 0.9) return 2;
+  if (ratio < 1) return 1;
+  return 0;
+}
+
+function manualScore(key: ManualScoreKey, value: number | null): number {
+  return manualScoreOrNull(key, value) ?? 0;
+}
+
+function manualScoreOrNull(
+  key: ManualScoreKey,
+  value: number | null,
+): number | null {
+  if (value == null || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(MANUAL_SCORE_LIMITS[key], Math.round(value)));
 }
 
 function moatScore(moat: Moat): number {
   switch (moat) {
     case "Excellent":
-      return 15;
+      return 10;
     case "Very Good":
-      return 12;
+      return 8;
     case "Good":
-      return 9;
-    case "Average":
       return 6;
+    case "Average":
+      return 4;
     case "Bad":
-      return 3;
+      return 2;
     case "Very Bad":
-      return 0;
     case "Unknown":
-      return 3;
+      return 0;
   }
 }
 
