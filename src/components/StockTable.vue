@@ -82,6 +82,9 @@ const defaultVisibleColumnIds = new Set<string>([
   "ticker",
   "actions",
   "company",
+  "oneYearChart",
+  "performance1Y",
+  "performance1W",
   "score",
   "roce",
   "grossMargin",
@@ -317,9 +320,7 @@ const table = useVueTable({
   getSortedRowModel: getSortedRowModel(),
 });
 
-const configurableColumns = computed(() =>
-  table.getAllLeafColumns(),
-);
+const configurableColumns = computed(() => table.getAllLeafColumns());
 const orderedConfigurableColumns = computed(() => {
   const columnsById = new Map(
     configurableColumns.value.map((column) => [column.id, column]),
@@ -336,8 +337,9 @@ const visibleColumnIds = computed(() =>
 );
 const selectedStock = computed(() =>
   selectedTicker.value
-    ? store.stocks.find((stock) => stock.ticker === selectedTicker.value) ?? null
-    : null
+    ? (store.stocks.find((stock) => stock.ticker === selectedTicker.value) ??
+      null)
+    : null,
 );
 
 function openColumnDialog(): void {
@@ -531,10 +533,7 @@ function tableDensityClass(): string {
 }
 
 function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
-  return [
-    "ticker",
-    ...order.filter((columnId) => columnId !== "ticker"),
-  ];
+  return ["ticker", ...order.filter((columnId) => columnId !== "ticker")];
 }
 </script>
 
@@ -601,18 +600,26 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
           <div
             class="mb-3 rounded-md border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-800 dark:bg-zinc-900/80"
           >
-            <div class="mb-2 text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400">
+            <div
+              class="mb-2 text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400"
+            >
               Row density
             </div>
             <div class="grid grid-cols-3 gap-2">
               <button
-                v-for="density in (['compact', 'default', 'comfortable'] as RowDensity[])"
+                v-for="density in [
+                  'compact',
+                  'default',
+                  'comfortable',
+                ] as RowDensity[]"
                 :key="density"
                 type="button"
                 class="h-9 rounded-md border px-3 text-xs font-bold capitalize transition"
-                :class="rowDensity === density
-                  ? 'border-cyan-300 bg-cyan-50 text-cyan-800 shadow-sm dark:border-cyan-700 dark:bg-cyan-950 dark:text-cyan-100'
-                  : 'border-zinc-300 bg-white text-zinc-700 hover:border-cyan-300 hover:bg-cyan-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950'"
+                :class="
+                  rowDensity === density
+                    ? 'border-cyan-300 bg-cyan-50 text-cyan-800 shadow-sm dark:border-cyan-700 dark:bg-cyan-950 dark:text-cyan-100'
+                    : 'border-zinc-300 bg-white text-zinc-700 hover:border-cyan-300 hover:bg-cyan-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-cyan-700 dark:hover:bg-cyan-950'
+                "
                 @click="setRowDensity(density)"
               >
                 {{ density }}
@@ -708,9 +715,7 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
               class="table-header-cell"
               :class="[
                 columnWidthClass(header.column.id),
-                header.column.id === 'ticker'
-                  ? 'ticker-sticky-header'
-                  : '',
+                header.column.id === 'ticker' ? 'ticker-sticky-header' : '',
                 header.column.getCanSort() ? 'cursor-pointer select-none' : '',
               ]"
               @click="header.column.getToggleSortingHandler()?.($event)"
@@ -722,7 +727,11 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
               >
                 <span
                   class="flex h-11 w-full items-center gap-1 leading-none"
-                  :class="header.column.id === 'ticker' ? 'justify-center text-center' : 'justify-start text-left'"
+                  :class="
+                    header.column.id === 'ticker'
+                      ? 'justify-center text-center'
+                      : 'justify-start text-left'
+                  "
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"
@@ -761,7 +770,11 @@ function pinTickerFirst(order: ColumnOrderState): ColumnOrderState {
         v-if="table.getRowModel().rows.length === 0"
         class="flex h-80 items-center justify-center text-sm font-semibold text-zinc-500 dark:text-zinc-400"
       >
-        {{ store.stocks.length === 0 ? "No stocks in this portfolio" : "No matching stocks" }}
+        {{
+          store.stocks.length === 0
+            ? "No stocks in this portfolio"
+            : "No matching stocks"
+        }}
       </div>
     </div>
 
