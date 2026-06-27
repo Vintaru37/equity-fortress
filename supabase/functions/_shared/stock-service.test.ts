@@ -227,7 +227,7 @@ Deno.test("calculateScore applies the 100-point fundamentals, risks, and catalys
     forwardPe: 14,
     netDebtToEbitda: 1.7,
     debtToEquity: 0.4,
-    customerDependenceScore: 4,
+    customerIndependenceScore: 4,
     analystConsensus: "Buy",
     beta: 0.95,
     moat: "Excellent",
@@ -252,7 +252,7 @@ Deno.test("calculateScore gives small moat credit when moat is unknown", () => {
     debtToEquity: 0.2,
     pe: 20,
     forwardPe: 10,
-    customerDependenceScore: 5,
+    customerIndependenceScore: 5,
     analystConsensus: "Strong Buy",
     beta: 0.7,
     moat: "Unknown",
@@ -293,7 +293,7 @@ Deno.test("calculateScore ignores analyst consensus in the current scoring syste
 function emptyStockData(): StockData {
   return {
     ticker: "TEST",
-    customerDependenceScore: null,
+    customerIndependenceScore: null,
     smartMoneyScore: null,
     backlogScore: null,
     buybacksScore: null,

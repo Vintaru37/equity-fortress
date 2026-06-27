@@ -46,7 +46,7 @@ The backend normalizes, deduplicates, and caps the ticker list at 25 symbols.
 ```ts
 interface StockData {
   ticker: string;
-  customerDependenceScore: number | null;
+  customerIndependenceScore: number | null;
   smartMoneyScore: number | null;
   backlogScore: number | null;
   buybacksScore: number | null;
@@ -85,7 +85,7 @@ interface StockData {
 | Field | Type | Source | Notes |
 | --- | --- | --- | --- |
 | `ticker` | `string` | Request | Normalized uppercase ticker. |
-| `customerDependenceScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for customer/contract/funding dependence; higher means safer. Edge responses set it to `null`, then the frontend merges portfolio state. |
+| `customerIndependenceScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for customer/contract/funding independence; higher means safer. Edge responses set it to `null`, then the frontend merges portfolio state. |
 | `smartMoneyScore` | `number \| null` | Supabase/local portfolio | Manual 0-15 score for politicians, governments, institutions, insiders, and Wall Street activity. |
 | `backlogScore` | `number \| null` | Supabase/local portfolio | Manual 0-10 score for new contracts, AI exposure, partnerships, and backlog. |
 | `buybacksScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for active share repurchases. |
@@ -152,7 +152,7 @@ The score is a 0-100 weighted score:
 | ROCE | 20 |
 | Gross margin | 10 |
 | Revenue growth + FCF margin | 10 |
-| Debt + manual dependence | 15 |
+| Debt + manual independence | 15 |
 | MOAT / competitiveness | 10 |
 | Valuation, Forward P/E vs P/E | 5 |
 | Manual Smart Money & Insiders | 15 |

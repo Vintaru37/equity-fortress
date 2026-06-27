@@ -14,10 +14,10 @@ export function calculateScore(data: StockData): number | null {
     (roceScore(data.roce) ?? 0) +
     (grossMarginScore(data.grossMargin) ?? 0) +
     (growthAndFcfScore(data.revenueGrowth, data.fcfMargin) ?? 0) +
-    (debtAndDependenceScore(
+    (debtAndIndependenceScore(
       data.netDebtToEbitda,
       data.debtToEquity,
-      data.customerDependenceScore,
+      data.customerIndependenceScore,
     ) ?? 0) +
     moatScore(data.moat) +
     (forwardPeValuationScore(data.pe, data.forwardPe) ?? 0) +
@@ -39,7 +39,7 @@ function hasScoreEvidence(data: StockData): boolean {
       data.debtToEquity,
       data.pe,
       data.forwardPe,
-      data.customerDependenceScore,
+    data.customerIndependenceScore,
       data.smartMoneyScore,
       data.backlogScore,
       data.buybacksScore,
@@ -109,20 +109,20 @@ function scoreThreshold(
   return 0;
 }
 
-function debtAndDependenceScore(
+function debtAndIndependenceScore(
   netDebtToEbitda: number | null,
   debtToEquity: number | null,
-  customerDependenceScore: number | null,
+  customerIndependenceScore: number | null,
 ): number | null {
   const debt = debtScore(netDebtToEbitda, debtToEquity);
-  const dependence = manualScoreOrNull(
-    "customerDependenceScore",
-    customerDependenceScore,
+  const independence = manualScoreOrNull(
+    "customerIndependenceScore",
+    customerIndependenceScore,
   );
 
-  return debt === null && dependence === null
+  return debt === null && independence === null
     ? null
-    : (debt ?? 0) + (dependence ?? 0);
+    : (debt ?? 0) + (independence ?? 0);
 }
 
 function debtScore(

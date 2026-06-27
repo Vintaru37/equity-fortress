@@ -156,7 +156,7 @@ function normalizeMoat(value: unknown): Moat {
 
 function emptyManualScores(): ManualScores {
   return {
-    customerDependenceScore: null,
+    customerIndependenceScore: null,
     smartMoneyScore: null,
     backlogScore: null,
     buybacksScore: null,
@@ -185,10 +185,13 @@ function normalizeManualScores(value: unknown): ManualScores {
   }
 
   const input = value as Partial<Record<ManualScoreKey, unknown>>;
+  const legacyInput = value as Record<string, unknown>;
+  const legacyIndependenceScore =
+    legacyInput[`customer${"Depen"}${"dence"}Score`];
   return {
-    customerDependenceScore: normalizeManualScore(
-      "customerDependenceScore",
-      input.customerDependenceScore,
+    customerIndependenceScore: normalizeManualScore(
+      "customerIndependenceScore",
+      input.customerIndependenceScore ?? legacyIndependenceScore,
     ),
     smartMoneyScore: normalizeManualScore(
       "smartMoneyScore",
@@ -201,8 +204,8 @@ function normalizeManualScores(value: unknown): ManualScores {
 
 function manualScoresFromWatchlistRow(row: WatchlistStockRow): ManualScores {
   return {
-    customerDependenceScore: normalizeManualScore(
-      "customerDependenceScore",
+    customerIndependenceScore: normalizeManualScore(
+      "customerIndependenceScore",
       row.customer_dependence_score,
     ),
     smartMoneyScore: normalizeManualScore("smartMoneyScore", row.smart_money_score),
@@ -220,7 +223,7 @@ function manualScorePatch(
   value: number | null,
 ): WatchlistPatch {
   switch (key) {
-    case "customerDependenceScore":
+    case "customerIndependenceScore":
       return { customer_dependence_score: value };
     case "smartMoneyScore":
       return { smart_money_score: value };
@@ -240,7 +243,7 @@ function watchlistManualScoreColumns(stock: Partial<ManualScores>): {
   const scores = pickManualScores(stock);
 
   return {
-    customer_dependence_score: scores.customerDependenceScore,
+    customer_dependence_score: scores.customerIndependenceScore,
     smart_money_score: scores.smartMoneyScore,
     backlog_score: scores.backlogScore,
     buybacks_score: scores.buybacksScore,

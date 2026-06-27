@@ -8,14 +8,14 @@ export type Moat =
   | "Unknown";
 
 export interface ManualScores {
-  customerDependenceScore: number | null;
+  customerIndependenceScore: number | null;
   smartMoneyScore: number | null;
   backlogScore: number | null;
   buybacksScore: number | null;
 }
 
 export const MANUAL_SCORE_LIMITS = {
-  customerDependenceScore: 5,
+  customerIndependenceScore: 5,
   smartMoneyScore: 15,
   backlogScore: 10,
   buybacksScore: 5,

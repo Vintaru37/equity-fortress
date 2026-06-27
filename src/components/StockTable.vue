@@ -35,7 +35,7 @@ const showColumnDialog = ref(false);
 const selectedTicker = ref<string | null>(null);
 const draggedColumnId = ref<string | null>(null);
 const dragOrderChanged = ref(false);
-const COLUMN_PREFS_KEY = "equity-fortress:table-columns:v3";
+const COLUMN_PREFS_KEY = "equity-fortress:table-columns:v4";
 
 const defaultColumnOrder = [
   "ticker",
@@ -48,7 +48,7 @@ const defaultColumnOrder = [
   "fcfMargin",
   "netDebtToEbitda",
   "debtToEquity",
-  "customerDependenceScore",
+  "customerIndependenceScore",
   "moat",
   "pe",
   "forwardPe",
@@ -89,7 +89,7 @@ const defaultVisibleColumnIds = new Set<string>([
   "fcfMargin",
   "netDebtToEbitda",
   "debtToEquity",
-  "customerDependenceScore",
+  "customerIndependenceScore",
   "moat",
   "pe",
   "forwardPe",
@@ -121,15 +121,15 @@ const columnDescriptions: Record<ColumnId, string> = {
     "Catalysts & Valuation, part of the 0-5 valuation score. A meaningfully lower Forward P/E versus P/E signals expected earnings growth.\n\nForward P/E = Share price / Estimated next-year EPS",
   peg: "Valuation adjusted for earnings growth. Hidden by default because the current scoring system uses Forward P/E versus P/E.\n\nPEG = P/E / EPS growth rate",
   netDebtToEbitda:
-    "Risks, auto debt input for the 0-15 Debt & Dependence score. Lower values usually mean safer debt management.\n\nNet Debt/EBITDA = (Total debt - Cash) / EBITDA",
+    "Risks, auto debt input for the 0-15 Debt & Independence score. Lower values usually mean safer debt management.\n\nNet Debt/EBITDA = (Total debt - Cash) / EBITDA",
   revenueGrowth:
     "Fundamentals, part of the 0-10 Revenue Growth & FCF score. Shows demand and business scale before margin effects.\n\nRevenue growth = (Current revenue - Prior revenue) / Prior revenue",
   epsGrowth:
     "How quickly earnings per share are growing versus the prior year. Hidden by default because the current scoring system does not weight it directly.\n\nEPS growth = (Current EPS - Prior EPS) / Prior EPS",
   debtToEquity:
-    "Risks, fallback debt input for the 0-15 Debt & Dependence score. Higher values usually mean more leverage risk.\n\nDebt/Equity = Total debt / Shareholders' equity",
-  customerDependenceScore:
-    "Manual 0-5 input inside the 0-15 Debt & Dependence score. Higher means lower dependence on one customer, contract, lender, or rate-sensitive funding.",
+    "Risks, fallback debt input for the 0-15 Debt & Independence score. Higher values usually mean more leverage risk.\n\nDebt/Equity = Total debt / Shareholders' equity",
+  customerIndependenceScore:
+    "Manual 0-5 input inside the 0-15 Debt & Independence score. Higher means more independence from one customer, contract, lender, or rate-sensitive funding.",
   beta: "How volatile the stock has been compared with the market. A beta above 1 tends to move more than the market; below 1 tends to move less.\n\nBeta = Covariance(stock returns, market returns) / Variance(market returns)",
   moat: "Risks, 0-10 competitiveness score input based on your qualitative competitive-advantage rating.",
   score: "0-100 score using Fundamentals, Risks, and Catalysts & Valuation.",
@@ -172,7 +172,7 @@ const columns: ColumnDef<StockRowData>[] = [
   { accessorKey: "revenueGrowth", header: "Rev Growth" },
   { accessorKey: "epsGrowth", header: "EPS Growth" },
   { accessorKey: "debtToEquity", header: "D/E" },
-  { accessorKey: "customerDependenceScore", header: "Dependence" },
+  { accessorKey: "customerIndependenceScore", header: "Independence" },
   { accessorKey: "beta", header: "Beta" },
   { accessorKey: "moat", header: "MOAT" },
   { accessorKey: "score", header: "Score" },
@@ -188,7 +188,7 @@ const columnWidthClasses: Record<string, string> = {
   company: "w-72 min-w-72",
   oneYearChart: "w-48 min-w-48",
   analystConsensus: "w-28 min-w-28",
-  customerDependenceScore: "w-32 min-w-32",
+  customerIndependenceScore: "w-36 min-w-36",
   moat: "w-36 min-w-36",
   score: "w-28 min-w-28",
   smartMoneyScore: "w-32 min-w-32",

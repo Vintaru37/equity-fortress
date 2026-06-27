@@ -152,7 +152,7 @@ function buildPortfolioMoatPrompt(): string {
     "•\tMarża Brutto (Cel: >40%): 0-10 pkt.",
     "•\tWzrost Przychodów & FCF: 0-10 pkt.",
     "2. Risks (0-25 pkt):",
-    "•\tZadłużenie & Zależność (Net Debt/EBITDA, koncentracja klientów): 0-15 pkt.",
+    "•\tZadłużenie & Niezależność (Net Debt/EBITDA, brak koncentracji klientów): 0-15 pkt.",
     "•\tKonkurencyjność (Moat): 0-10 pkt.",
     "3. Catalysts & Valuation (0-35 pkt):",
     "•\tWycena (Forward P/E vs P/E): 0-5 pkt.",

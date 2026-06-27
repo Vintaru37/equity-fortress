@@ -342,7 +342,7 @@ Score jest liczony w skali 0-100:
 - ROCE: 20 pkt
 - Gross margin: 10 pkt
 - Revenue growth + FCF margin: 10 pkt
-- Debt + manual customer/contract dependence: 15 pkt
+- Debt + manual customer/contract independence: 15 pkt
 - MOAT / competitiveness: 10 pkt (`Unknown` daje 0 pkt)
 - Valuation, Forward P/E vs P/E: 5 pkt
 - Manual Smart Money & Insiders: 15 pkt

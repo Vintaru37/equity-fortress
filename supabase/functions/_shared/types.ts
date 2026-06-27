@@ -8,7 +8,7 @@ export type Moat =
   | "Unknown";
 
 export interface ManualScores {
-  customerDependenceScore: number | null;
+  customerIndependenceScore: number | null;
   smartMoneyScore: number | null;
   backlogScore: number | null;
   buybacksScore: number | null;

@@ -200,16 +200,16 @@ function hasScoreDetails(stock: StockRowData): boolean {
         <MetricBadge :value="row.original.debtToEquity" kind="debt" :decimals="2" />
       </td>
       <td
-        v-else-if="columnId === 'customerDependenceScore'"
-        class="table-cell w-32 min-w-32"
+        v-else-if="columnId === 'customerIndependenceScore'"
+        class="table-cell w-36 min-w-36"
         @click.stop
         @keydown.stop
       >
         <PointSelect
-          :model-value="row.original.customerDependenceScore"
-          :max="MANUAL_SCORE_LIMITS.customerDependenceScore"
-          :label="`Customer dependence score for ${row.original.ticker}`"
-          @update:model-value="(value) => updateManualScore('customerDependenceScore', value)"
+          :model-value="row.original.customerIndependenceScore"
+          :max="MANUAL_SCORE_LIMITS.customerIndependenceScore"
+          :label="`Customer independence score for ${row.original.ticker}`"
+          @update:model-value="(value) => updateManualScore('customerIndependenceScore', value)"
         />
       </td>
       <td v-else-if="columnId === 'beta'" class="table-cell numeric-cell w-28 min-w-28">
