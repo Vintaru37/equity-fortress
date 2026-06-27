@@ -203,8 +203,8 @@ Deno.test("createRefreshPayload preserves cached historical data for partial ful
   ]);
 });
 
-Deno.test("calculateScore returns null when no score inputs are available", () => {
-  assertEquals(calculateScore(emptyStockData()), null);
+Deno.test("calculateScore returns zero when only default manual scores are available", () => {
+  assertEquals(calculateScore(emptyStockData()), 0);
 });
 
 Deno.test("calculateScore adds moat points while unknown moat remains zero", () => {
@@ -287,16 +287,16 @@ Deno.test("calculateScore ignores analyst consensus in the current scoring syste
   assertEquals(calculateScore({
     ...emptyStockData(),
     analystConsensus: "Hold",
-  }), null);
+  }), 0);
 });
 
 function emptyStockData(): StockData {
   return {
     ticker: "TEST",
-    customerIndependenceScore: null,
-    smartMoneyScore: null,
-    backlogScore: null,
-    buybacksScore: null,
+    customerIndependenceScore: 0,
+    smartMoneyScore: 0,
+    backlogScore: 0,
+    buybacksScore: 0,
     company: null,
     currentPrice: null,
     oneYearChart: [],

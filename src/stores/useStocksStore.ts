@@ -156,10 +156,10 @@ function normalizeMoat(value: unknown): Moat {
 
 function emptyManualScores(): ManualScores {
   return {
-    customerIndependenceScore: null,
-    smartMoneyScore: null,
-    backlogScore: null,
-    buybacksScore: null,
+    customerIndependenceScore: 0,
+    smartMoneyScore: 0,
+    backlogScore: 0,
+    buybacksScore: 0,
   };
 }
 
@@ -168,12 +168,12 @@ function normalizeManualScore(
   value: unknown,
 ): number | null {
   if (value === null || value === undefined || value === "") {
-    return null;
+    return 0;
   }
 
   const numericValue = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numericValue)) {
-    return null;
+    return 0;
   }
 
   return Math.max(0, Math.min(MANUAL_SCORE_LIMITS[key], Math.round(numericValue)));

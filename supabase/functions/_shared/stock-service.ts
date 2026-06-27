@@ -348,10 +348,10 @@ export function emptyStockData(
 ): StockData {
   return {
     ticker,
-    customerIndependenceScore: null,
-    smartMoneyScore: null,
-    backlogScore: null,
-    buybacksScore: null,
+    customerIndependenceScore: 0,
+    smartMoneyScore: 0,
+    backlogScore: 0,
+    buybacksScore: 0,
     company: null,
     currentPrice: null,
     oneYearChart: [],
@@ -930,10 +930,10 @@ export function composeStockData(
 
   const stockData: StockData = {
     ticker,
-    customerIndependenceScore: null,
-    smartMoneyScore: null,
-    backlogScore: null,
-    buybacksScore: null,
+    customerIndependenceScore: 0,
+    smartMoneyScore: 0,
+    backlogScore: 0,
+    buybacksScore: 0,
     company:
       firstString(profile, ["companyName", "company", "name"]) ??
       firstString(quote, ["name", "companyName"]),

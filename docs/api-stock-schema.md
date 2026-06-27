@@ -85,7 +85,7 @@ interface StockData {
 | Field | Type | Source | Notes |
 | --- | --- | --- | --- |
 | `ticker` | `string` | Request | Normalized uppercase ticker. |
-| `customerIndependenceScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for customer/contract/funding independence; higher means safer. Edge responses set it to `null`, then the frontend merges portfolio state. |
+| `customerIndependenceScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for customer/contract/funding independence; higher means safer. Missing values default to 0 in the app. |
 | `smartMoneyScore` | `number \| null` | Supabase/local portfolio | Manual 0-15 score for politicians, governments, institutions, insiders, and Wall Street activity. |
 | `backlogScore` | `number \| null` | Supabase/local portfolio | Manual 0-10 score for new contracts, AI exposure, partnerships, and backlog. |
 | `buybacksScore` | `number \| null` | Supabase/local portfolio | Manual 0-5 score for active share repurchases. |
