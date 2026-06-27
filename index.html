@@ -2,16 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/src/assets/images/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Equity Fortress</title>
     <script>
       (() => {
         try {
-          const persisted = window.localStorage.getItem("equity-fortress:theme");
-          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          const theme = persisted === "light" || persisted === "dark"
-            ? persisted
-            : prefersDark ? "dark" : "light";
+          const persisted = window.localStorage.getItem(
+            "equity-fortress:theme",
+          );
+          const prefersDark = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+          ).matches;
+          const theme =
+            persisted === "light" || persisted === "dark"
+              ? persisted
+              : prefersDark
+                ? "dark"
+                : "light";
           document.documentElement.classList.toggle("dark", theme === "dark");
           document.documentElement.style.colorScheme = theme;
         } catch {
