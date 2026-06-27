@@ -165,7 +165,7 @@ function buildPortfolioMoatPrompt(): string {
     "o\tPodasz łączną sumę punktów.",
     "o\tPrzypiszesz kategorię (90-100: Unicorn/Silne Kupuj (Okazja dekady) | 75-89: Smart Money Play/Kupuj | 60-74: Trzymaj/Akumuluj | <60: Unikaj).",
     "o\tOkreślisz konkretną metodę wejścia: Jednorazowo (Lump Sum) czy DCA (Akumulacja), uzasadniając wybór w jednym zdaniu (np. wejście pod szybki katalizator vs budowanie pozycji na korektach).",
-    "3.\tDodaj drugą tabelę 'Wartości do aplikacji', gdzie wiersze to spółki, a kolumny to: Dependence/Zależność (0-5), Moat/Konkurencyjność (0-10), Smart Money (0-15), AI/Backlog (0-10), Buybacks (0-5), Czy długoterminowa? (Tak/Nie: 5-10 lat+ vs spekulacja pod katalizator) oraz krótkie uzasadnienie.",
+    "3.\tDodaj drugą tabelę 'Wartości do aplikacji', gdzie wiersze to spółki, a kolumny to: Independence/Niezależność (0-5), Moat/Konkurencyjność (0-10), Smart Money (0-15), AI/Backlog (0-10), Buybacks (0-5), Czy długoterminowa? (Tak/Nie: 5-10 lat+ vs spekulacja pod katalizator) oraz krótkie uzasadnienie.",
     "4.\tDodaj sekcję, w której jednoznacznie ocenisz czy spółka jest bezpieczną inwestycją długoterminową (5-10 lat+), czy jedynie spekulacyjnym zagraniem pod katalizator.",
     "5.\tUwzględnij najświeższe dane z obecnego roku, w tym aktywność Smart Money (np. Pelosi, fundusze rządowe, instytucje, Wall Street).",
   ].join("\n");
